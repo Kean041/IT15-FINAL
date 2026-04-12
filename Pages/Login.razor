@@ -1,0 +1,152 @@
+@page "/login"
+
+<style>
+    /* Scope styles for the login page */
+    .auth-bg {
+        background-color: #f4f7f6;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+    }
+
+    .auth-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        max-width: 450px;
+        width: 100%;
+        background-color: #ffffff;
+    }
+
+    .auth-card-header {
+        background-color: #00ADB5; /* Turquoise */
+        color: #ffffff;
+        padding: 2rem 1.5rem;
+        text-align: center;
+        border-bottom: 4px solid #00ADB5; /* Turquoise Base */
+    }
+
+    .auth-card-body {
+        padding: 2.5rem 2rem;
+    }
+
+    .btn-turquoise {
+        background-color: #00ADB5;
+        color: #ffffff;
+        font-weight: 500;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-turquoise:hover {
+        background-color: #008F96;
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 173, 181, 0.3);
+    }
+
+    .form-control:focus, .form-check-input:focus {
+        border-color: #00ADB5;
+        box-shadow: 0 0 0 0.25rem rgba(0, 173, 181, 0.25);
+    }
+    
+    .form-check-input:checked {
+        background-color: #00ADB5;
+        border-color: #00ADB5;
+    }
+    
+    .text-turquoise {
+        color: #00ADB5 !important;
+    }
+    
+    .text-turquoise:hover {
+        color: #008F96 !important;
+    }
+
+    .password-toggle {
+        cursor: pointer;
+        color: #6c757d;
+        transition: color 0.2s ease;
+    }
+    
+    .password-toggle:hover {
+        color: #00ADB5;
+    }
+</style>
+
+<div class="auth-bg">
+    <div class="auth-card">
+        <!-- 1. Header Section -->
+        <div class="auth-card-header">
+            <h3 class="fw-bold mb-2"><i class="bi bi-shield-lock-fill me-2" style="color: #00ADB5;"></i>FinSight ERP</h3>
+            <p class="mb-0 text-white-50 small">Login to your account</p>
+        </div>
+
+        <!-- 2. Form Section -->
+        <div class="auth-card-body">
+            
+            <!-- Alert Area (UI Only) -->
+            <div class="alert alert-danger d-none py-2 text-sm" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> Invalid email or password.
+            </div>
+
+            <form>
+                <!-- Email Field -->
+                <div class="mb-4">
+                    <label for="emailInput" class="form-label fw-semibold text-secondary small mb-1">Email Address</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light text-muted border-end-0"><i class="bi bi-envelope"></i></span>
+                        <input type="email" class="form-control border-start-0 ps-0" id="emailInput" placeholder="name@company.com">
+                    </div>
+                    <!-- Placeholder Validation -->
+                    <div class="form-text text-danger d-none small"><i class="bi bi-info-circle me-1"></i>Email is required.</div>
+                </div>
+
+                <!-- Password Field -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label for="passwordInput" class="form-label fw-semibold text-secondary small mb-0">Password</label>
+                        <a href="#" class="text-decoration-none text-turquoise small">Forgot Password?</a>
+                    </div>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light text-muted border-end-0"><i class="bi bi-lock"></i></span>
+                        <input type="@(_showPassword ? "text" : "password")" class="form-control border-start-0 border-end-0 ps-0" id="passwordInput" placeholder="Enter your password">
+                        <span class="input-group-text bg-white password-toggle border-start-0" @onclick="TogglePasswordVisibility">
+                            <i class="bi @(_showPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                        </span>
+                    </div>
+                    <!-- Placeholder Validation -->
+                    <div class="form-text text-danger d-none small"><i class="bi bi-info-circle me-1"></i>Password is required.</div>
+                </div>
+
+                <!-- Remember Me -->
+                <div class="mb-4 form-check">
+                    <input type="checkbox" class="form-check-input" id="rememberMeCheck">
+                    <label class="form-check-label text-secondary small" for="rememberMeCheck">Remember me</label>
+                </div>
+
+                <!-- Login Button -->
+                <button type="button" class="btn btn-turquoise w-100 py-2 mb-3 shadow-sm">Login Securely</button>
+
+                <!-- Register Link (Below Form) -->
+                <div class="text-center mt-4">
+                    <span class="text-secondary small">Don't have an account? </span>
+                    <a href="/register" class="fw-bold text-decoration-none text-turquoise small">Register</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@code {
+    // UI logic for toggling password visibility
+    private bool _showPassword = false;
+
+    private void TogglePasswordVisibility()
+    {
+        _showPassword = !_showPassword;
+    }
+}
