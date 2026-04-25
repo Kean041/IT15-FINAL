@@ -1,0 +1,448 @@
+@model FinSight.Models.ViewModels.SuperAdminSubscriptionViewModel
+
+@{
+    Layout = "_SuperAdminLayout";
+    ViewData["Title"] = "Global Subscriptions";
+}
+
+<style>
+/* ── Color tokens ──────────────────────────── */
+:root {
+    --tq: #05828e;
+    --tq-dark: #047078;
+    --tq-light: rgba(5, 130, 142, 0.08);
+    --tq-glow: rgba(5, 130, 142, 0.18);
+    --navy: #162229;
+    --danger: #E26D5C;
+    --danger-dark: #c95c4d;
+    --success: #10b981;
+    --success-light: rgba(16, 185, 129, 0.08);
+    --warning: #f59e0b;
+    --warning-light: rgba(245, 158, 11, 0.08);
+    --muted-color: #9ba8b8;
+}
+
+/* ── Backgrounds & Text ────────────────────── */
+.bg-offwhite    { background-color: #e7eaef; }
+.bg-turquoise   { background-color: var(--tq) !important; color: #fff; }
+.text-turquoise { color: var(--tq) !important; }
+.text-navy      { color: var(--navy) !important; }
+.border-muted   { border-color: var(--muted-color) !important; }
+
+/* ── Cards ─────────────────────────────────── */
+.card-dashboard {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 1.25rem 1.5rem;
+    transition: box-shadow 0.2s ease;
+}
+.card-dashboard:hover {
+    box-shadow: 0 8px 24px var(--tq-glow), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.analytics-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    padding: 20px;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    border-left: 5px solid var(--tq);
+}
+.analytics-card-navy    { border-left-color: var(--navy); }
+.analytics-card-success { border-left-color: var(--success); }
+.analytics-card-warning { border-left-color: var(--warning); }
+.analytics-card-danger  { border-left-color: var(--danger); }
+
+/* ── Buttons ───────────────────────────────── */
+.btn-turquoise {
+    background-color: var(--tq);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
+}
+.btn-turquoise:hover {
+    background-color: var(--tq-dark);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--tq-glow);
+}
+
+.btn-outline-turquoise {
+    color: var(--tq);
+    border: 1.5px solid var(--tq);
+    border-radius: 10px;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.btn-outline-turquoise:hover {
+    background-color: var(--tq-light);
+    color: var(--tq);
+    box-shadow: 0 0 0 3px var(--tq-glow);
+}
+
+.btn-soft-danger {
+    background-color: rgba(226, 109, 92, 0.1);
+    color: var(--danger);
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.18s, color 0.18s, transform 0.15s;
+}
+.btn-soft-danger:hover {
+    background-color: var(--danger);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+/* ── Table ─────────────────────────────────── */
+.table thead th {
+    border-bottom: 2px solid var(--muted-color) !important;
+    color: var(--navy) !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    background-color: transparent !important;
+    padding: 14px 16px;
+}
+.table tbody td {
+    vertical-align: middle;
+    color: #2d3748;
+    padding: 13px 16px;
+    border-bottom: 1px solid rgba(155, 168, 184, 0.2);
+}
+.table tbody tr {
+    transition: background 0.15s;
+}
+.table tbody tr:hover {
+    background: rgba(5, 130, 142, 0.04);
+}
+
+/* ── Status Badges ─────────────────────────── */
+.badge-active  { background-color: #d1fae5; color: #065f46; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
+.badge-pending { background-color: #fef3c7; color: #92400e; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
+.badge-expired { background-color: #fee2e2; color: #991b1b; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
+
+.badge-paid    { background-color: rgba(16, 185, 129, 0.1); color: #10b981; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase;}
+.badge-pay-pending { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase;}
+.badge-failed  { background-color: rgba(226, 109, 92, 0.1); color: #E26D5C; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase;}
+
+/* ── Forms/Inputs ──────────────────────────── */
+.form-control, .form-select {
+    border: 1px solid rgba(155, 168, 184, 0.5);
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--tq);
+    box-shadow: 0 0 0 0.25rem var(--tq-glow);
+}
+</style>
+
+<div class="container-fluid px-0">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-navy mb-0">Subscription Lifecycle</h2>
+            <p class="text-muted mb-0">Manage tenant plans, monitor active durations, and handle renewals.</p>
+        </div>
+        <div>
+            <button class="btn btn-turquoise shadow-sm px-4 py-2">
+                <i class="bi bi-plus-circle me-2"></i>New Subscription
+            </button>
+        </div>
+    </div>
+
+    <!-- Analytics Summary Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Active Subscriptions -->
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-success">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Active Plans</h6>
+                        <h3 class="fw-bold text-success mb-0">@Model.TotalActiveSubscriptions</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background: var(--success-light); width: 48px; height: 48px;">
+                        <i class="bi bi-check2-circle text-success fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Expiring Soon -->
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-warning">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Expiring Soon</h6>
+                        <h3 class="fw-bold text-warning mb-0">@Model.ExpiringSoon</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background: var(--warning-light); width: 48px; height: 48px;">
+                        <i class="bi bi-clock-history text-warning fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Expired Subscriptions -->
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-danger">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Expired</h6>
+                        <h3 class="fw-bold text-danger mb-0">@Model.ExpiredSubscriptions</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background: rgba(226, 109, 92, 0.1); width: 48px; height: 48px;">
+                        <i class="bi bi-exclamation-triangle text-danger fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Total Tenants -->
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-navy">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Total Tenants</h6>
+                        <h3 class="fw-bold text-navy mb-0">@Model.TotalTenants</h3>
+                    </div>
+                    <div class="bg-offwhite rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-buildings text-navy fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="card card-dashboard mb-4 mt-2">
+
+        <!-- Search & Filters -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
+            <h5 class="fw-bold text-navy mb-0 ps-2"><i class="bi bi-card-checklist me-2 text-turquoise"></i>Subscription Records</h5>
+
+            <form asp-action="Subscriptions" method="get" class="d-flex align-items-center gap-2 flex-wrap">
+                <!-- Status Filter -->
+                <select name="statusFilter" class="form-select rounded-3 shadow-sm" style="width: 130px;">
+                    <option value="" selected="@(string.IsNullOrEmpty(Model.StatusFilter) ? "selected" : null)">All Status</option>
+                    <option value="Active" selected="@(Model.StatusFilter == "Active" ? "selected" : null)">Active</option>
+                    <option value="Pending" selected="@(Model.StatusFilter == "Pending" ? "selected" : null)">Pending</option>
+                    <option value="Expired" selected="@(Model.StatusFilter == "Expired" ? "selected" : null)">Expired</option>
+                </select>
+
+                <!-- Plan Filter -->
+                <select name="planFilter" class="form-select rounded-3 shadow-sm" style="width: 140px;">
+                    <option value="" selected="@(string.IsNullOrEmpty(Model.PlanFilter) ? "selected" : null)">All Plans</option>
+                    <option value="Starter" selected="@(Model.PlanFilter == "Starter" ? "selected" : null)">Starter</option>
+                    <option value="Professional" selected="@(Model.PlanFilter == "Professional" ? "selected" : null)">Professional</option>
+                    <option value="Enterprise" selected="@(Model.PlanFilter == "Enterprise" ? "selected" : null)">Enterprise</option>
+                </select>
+
+                <!-- Date Filter -->
+                <select name="dateRangeFilter" class="form-select rounded-3 shadow-sm" style="width: 140px;">
+                    <option value="" selected="@(string.IsNullOrEmpty(Model.DateRangeFilter) ? "selected" : null)">All Time</option>
+                    <option value="Expiring30" selected="@(Model.DateRangeFilter == "Expiring30" ? "selected" : null)">Expiring < 30d</option>
+                    <option value="RecentlyAdded" selected="@(Model.DateRangeFilter == "RecentlyAdded" ? "selected" : null)">Recently Added</option>
+                </select>
+
+                <!-- Search Input -->
+                <div class="input-group shadow-sm rounded-3 overflow-hidden" style="width: 250px;">
+                    <span class="input-group-text bg-white border-muted text-turquoise"><i class="bi bi-search"></i></span>
+                    <input type="text" name="searchString" value="@Model.SearchString" class="form-control border-muted border-start-0 shadow-none" placeholder="Search company..." />
+                </div>
+                
+                <button type="submit" class="btn btn-turquoise rounded-3 px-3 shadow-sm fw-semibold">Search</button>
+                @if (!string.IsNullOrEmpty(Model.SearchString) || !string.IsNullOrEmpty(Model.StatusFilter) || !string.IsNullOrEmpty(Model.PlanFilter) || !string.IsNullOrEmpty(Model.DateRangeFilter))
+                {
+                    <a asp-action="Subscriptions" class="btn btn-light rounded-3 text-danger shadow-sm"><i class="bi bi-x-circle"></i> Clear</a>
+                }
+            </form>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive rounded-top-3">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Company / Tenant</th>
+                            <th>Plan Name</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Sub Status</th>
+                            <th>Pay Status</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Subscriptions != null && Model.Subscriptions.Any())
+                        {
+                            foreach (var sub in Model.Subscriptions)
+                            {
+                                var subBadge = sub.Status.ToLower() switch
+                                {
+                                    "active" => "badge-active",
+                                    "pending" => "badge-pending",
+                                    "expired" => "badge-expired",
+                                    _ => "badge-pending"
+                                };
+
+                                var payBadge = sub.PaymentStatus.ToLower() switch
+                                {
+                                    "paid" => "badge-paid",
+                                    "pending" => "badge-pay-pending",
+                                    "failed" => "badge-failed",
+                                    _ => "badge-pay-pending"
+                                };
+
+                                <tr>
+                                    <td class="ps-4 fw-semibold text-navy">@sub.TenantName</td>
+                                    <td class="text-secondary fw-medium">
+                                        <i class="bi bi-box me-1 text-turquoise"></i> @sub.PlanName
+                                    </td>
+                                    <td class="text-secondary small">@sub.StartDate.ToString("MMM dd, yyyy")</td>
+                                    <td class="text-secondary small fw-medium">@sub.EndDate.ToString("MMM dd, yyyy")</td>
+                                    <td><span class="badge @subBadge">@sub.Status</span></td>
+                                    <td><span class="badge @payBadge"><i class="bi bi-circle-fill me-1" style="font-size:6px; vertical-align:middle;"></i>@sub.PaymentStatus</span></td>
+                                    <td class="text-end pe-4">
+                                        <div class="d-flex justify-content-end gap-1">
+                                            <button class="btn btn-sm btn-outline-turquoise" 
+                                                    onclick="openSubDetailsModal('@sub.SubscriptionID', '@sub.TenantName', '@sub.PlanName', '@sub.StartDate.ToString("MMM dd, yyyy")', '@sub.EndDate.ToString("MMM dd, yyyy")', '@sub.Status', '@sub.PaymentStatus')"
+                                                    title="View Details">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-turquoise" title="Renew / Extend">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-soft-danger" title="Deactivate">
+                                                <i class="bi bi-power"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="bi bi-card-list fs-1 d-block mb-3 text-turquoise"></i>
+                                    No subscription records found.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            @if (Model.TotalPages > 1)
+            {
+                <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-white" style="border-radius: 0 0 16px 16px;">
+                    <span class="text-muted small fw-medium">Showing Page @Model.CurrentPage of @Model.TotalPages</span>
+                    <ul class="pagination pagination-sm mb-0 shadow-sm">
+                        @for (int i = 1; i <= Model.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                <a class="page-link" asp-action="Subscriptions" asp-route-page="@i" asp-route-searchString="@Model.SearchString" asp-route-statusFilter="@Model.StatusFilter" asp-route-planFilter="@Model.PlanFilter" asp-route-dateRangeFilter="@Model.DateRangeFilter">@i</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ SUBSCRIPTION DETAILS MODAL ═══════════ -->
+<div class="modal fade" id="subDetailsModal" tabindex="-1" aria-labelledby="subDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header border-0" style="background:#080b11;">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle"
+                         style="width:38px;height:38px;background:rgba(5, 130, 142, 0.15);">
+                        <i class="bi bi-card-checklist" style="color:var(--tq);"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-white mb-0" id="subDetailsModalLabel">Subscription Profile</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="background:#fff;">
+                
+                <div class="text-center mb-4 pb-4 border-bottom border-muted" style="border-bottom-style: dashed !important;">
+                    <h4 class="fw-bold text-navy mb-1" id="modalTenant">Company Name</h4>
+                    <span class="badge badge-active mb-2" id="modalStatus">Status</span>
+                    <p class="text-muted small mb-0">Subscription ID: <span class="font-monospace" id="modalId">#0000</span></p>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-box me-1"></i> Plan Tier</div>
+                    <div class="col-7 fw-semibold text-navy text-end" id="modalPlan">Plan Name</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-calendar-event me-1"></i> Start Date</div>
+                    <div class="col-7 fw-semibold text-navy text-end" id="modalStart">Jan 01, 2026</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-calendar-x me-1"></i> End Date</div>
+                    <div class="col-7 fw-semibold text-navy text-end" id="modalEnd">Dec 31, 2026</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-credit-card me-1"></i> Payment Status</div>
+                    <div class="col-7 text-end">
+                        <span class="badge badge-paid" id="modalPayStatus">PAID</span>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex justify-content-between" style="background:#fff;">
+                <button type="button" class="btn btn-outline-turquoise fw-semibold shadow-sm w-100 me-2" style="border-radius:10px;">View Billing History</button>
+                <button type="button" class="btn btn-turquoise fw-semibold shadow-sm w-100" data-bs-dismiss="modal" style="border-radius:10px;">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openSubDetailsModal(id, tenant, plan, start, end, status, payStatus) {
+        // Populate text
+        document.getElementById('modalId').innerText = "#" + id;
+        document.getElementById('modalTenant').innerText = tenant;
+        document.getElementById('modalPlan').innerText = plan;
+        document.getElementById('modalStart').innerText = start;
+        document.getElementById('modalEnd').innerText = end;
+
+        // Set Subscription Status Badge
+        const statusBadge = document.getElementById('modalStatus');
+        statusBadge.innerText = status;
+        statusBadge.className = 'badge mb-2'; // reset
+        const statusLower = status.toLowerCase();
+        if (statusLower === 'active') statusBadge.classList.add('badge-active');
+        else if (statusLower === 'pending') statusBadge.classList.add('badge-pending');
+        else if (statusLower === 'expired') statusBadge.classList.add('badge-expired');
+        else statusBadge.classList.add('badge-pending');
+
+        // Set Payment Status Badge
+        const payBadge = document.getElementById('modalPayStatus');
+        payBadge.innerText = payStatus;
+        payBadge.className = 'badge'; // reset
+        const payLower = payStatus.toLowerCase();
+        if (payLower === 'paid') payBadge.classList.add('badge-paid');
+        else if (payLower === 'failed') payBadge.classList.add('badge-failed');
+        else payBadge.classList.add('badge-pay-pending');
+
+        // Show modal
+        var modal = new bootstrap.Modal(document.getElementById('subDetailsModal'));
+        modal.show();
+    }
+</script>
+}

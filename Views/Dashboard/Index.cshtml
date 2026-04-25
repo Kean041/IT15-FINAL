@@ -1,0 +1,613 @@
+@model FinSight.Models.ViewModels.DashboardViewModel
+
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<style>
+    /* ── Dashboard Design Tokens ────────────────── */
+    :root {
+        --tq:        #05828e;
+        --tq-dark:   #047078;
+        --tq-light:  rgba(5,130,142,0.08);
+        --tq-glow:   rgba(5,130,142,0.18);
+        --navy:      #162229;
+        --muted-clr: #9ba8b8;
+        --bg-page:   #e7eaef;
+        --card-bg:   #ffffff;
+    }
+
+    /* ── Greeting ──────────────────────────────── */
+    .dash-greeting { margin-bottom: 28px; }
+    .dash-greeting h2 {
+        font-weight: 800;
+        font-size: 1.65rem;
+        color: var(--navy);
+        margin-bottom: 2px;
+    }
+    .dash-greeting p {
+        color: var(--muted-clr);
+        font-size: 0.92rem;
+        margin: 0;
+    }
+    .dash-greeting .accent { color: var(--tq); }
+
+    /* ── KPI Cards ─────────────────────────────── */
+    .kpi-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 22px 24px;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.04);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+        transition: all 0.28s cubic-bezier(.4,0,.2,1);
+    }
+    .kpi-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 32px rgba(5,130,142,0.12), 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .kpi-card::after {
+        content: '';
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--tq), var(--tq-dark));
+        border-radius: 0 0 16px 16px;
+        opacity: 0;
+        transition: opacity 0.28s;
+    }
+    .kpi-card:hover::after { opacity: 1; }
+
+    .kpi-icon {
+        width: 52px; height: 52px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.35rem;
+        flex-shrink: 0;
+        transition: transform 0.28s;
+    }
+    .kpi-card:hover .kpi-icon { transform: scale(1.08); }
+
+    .kpi-icon-tq   { background: var(--tq-light); color: var(--tq); }
+    .kpi-icon-navy  { background: rgba(22,34,41,0.08); color: var(--navy); }
+    .kpi-icon-amber { background: rgba(245,158,11,0.10); color: #f59e0b; }
+    .kpi-icon-green { background: rgba(16,185,129,0.10); color: #10b981; }
+
+    .kpi-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted-clr);
+        margin-bottom: 6px;
+    }
+    .kpi-value {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: var(--navy);
+        line-height: 1.1;
+    }
+    .kpi-value.accent { color: var(--tq); }
+
+    .kpi-subtitle {
+        font-size: 0.75rem;
+        color: var(--muted-clr);
+        margin-top: 4px;
+    }
+
+    /* ── Chart Cards ───────────────────────────── */
+    .chart-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1px solid rgba(0,0,0,0.04);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+        padding: 24px;
+        height: 100%;
+        transition: box-shadow 0.25s;
+    }
+    .chart-card:hover {
+        box-shadow: 0 8px 28px rgba(5,130,142,0.10), 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .chart-card-title {
+        font-weight: 700;
+        font-size: 1.02rem;
+        color: var(--navy);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .chart-card-title i {
+        color: var(--tq);
+        font-size: 1.15rem;
+    }
+    .chart-wrapper {
+        position: relative;
+        width: 100%;
+        height: 300px;
+    }
+
+    /* ── Table Card ────────────────────────────── */
+    .activity-card {
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1px solid rgba(0,0,0,0.04);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+        overflow: hidden;
+        transition: box-shadow 0.25s;
+    }
+    .activity-card:hover {
+        box-shadow: 0 8px 28px rgba(5,130,142,0.10), 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .activity-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .activity-header h5 {
+        font-weight: 700;
+        font-size: 1.02rem;
+        color: var(--navy);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .activity-header h5 i { color: var(--tq); }
+
+    /* Table */
+    .dash-table { width: 100%; border-collapse: collapse; }
+    .dash-table thead th {
+        background: var(--navy);
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 13px 18px;
+        border: none;
+    }
+    .dash-table thead th:first-child { padding-left: 24px; }
+    .dash-table thead th:last-child  { padding-right: 24px; }
+
+    .dash-table tbody td {
+        padding: 14px 18px;
+        font-size: 0.88rem;
+        color: #2d3748;
+        border-bottom: 1px solid rgba(155,168,184,0.12);
+        vertical-align: middle;
+    }
+    .dash-table tbody td:first-child { padding-left: 24px; }
+    .dash-table tbody td:last-child  { padding-right: 24px; }
+
+    .dash-table tbody tr {
+        transition: background 0.18s;
+    }
+    .dash-table tbody tr:hover {
+        background: rgba(5,130,142,0.03);
+    }
+    .dash-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* Badges */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.73rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+    .status-badge::before {
+        content: '';
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .badge-pending  { background: #fef3c7; color: #92400e; }
+    .badge-pending::before  { background: #f59e0b; }
+    .badge-approved { background: #d1fae5; color: #065f46; }
+    .badge-approved::before { background: #10b981; }
+    .badge-rejected { background: #fee2e2; color: #991b1b; }
+    .badge-rejected::before { background: #ef4444; }
+
+    .fw-amount { font-weight: 700; font-family: 'Inter', monospace; }
+    .text-dept { color: var(--tq); font-weight: 600; }
+
+    /* ── Empty state ──────────────────────────── */
+    .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--muted-clr);
+    }
+    .empty-state i {
+        font-size: 2.2rem;
+        margin-bottom: 12px;
+        color: var(--tq);
+        opacity: 0.5;
+    }
+
+    /* ── Fade-in animation ────────────────────── */
+    .fade-up {
+        opacity: 0;
+        transform: translateY(18px);
+        animation: fadeUp 0.5s ease forwards;
+    }
+    @@keyframes fadeUp {
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .delay-1 { animation-delay: 0.06s; }
+    .delay-2 { animation-delay: 0.12s; }
+    .delay-3 { animation-delay: 0.18s; }
+    .delay-4 { animation-delay: 0.24s; }
+    .delay-5 { animation-delay: 0.30s; }
+    .delay-6 { animation-delay: 0.36s; }
+    .delay-7 { animation-delay: 0.42s; }
+
+    /* ── Quick-link pill ──────────────────────── */
+    .quick-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 16px;
+        border-radius: 50px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-decoration: none;
+        color: var(--tq);
+        background: var(--tq-light);
+        border: 1.5px solid transparent;
+        transition: all 0.22s;
+    }
+    .quick-link:hover {
+        background: var(--tq);
+        color: #fff;
+        border-color: var(--tq);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px var(--tq-glow);
+    }
+</style>
+
+<div class="container-fluid px-0">
+
+    <!-- ═══════════ GREETING ═══════════ -->
+    <div class="dash-greeting fade-up delay-1">
+        <h2>Welcome back, <span class="accent">@Model.UserName</span> 👋</h2>
+        <p>Here's your financial overview for @DateTime.Now.ToString("MMMM yyyy"). Stay on top of your budgets and requests.</p>
+    </div>
+
+    <!-- ═══════════ KPI CARDS ═══════════ -->
+    <div class="row g-3 mb-4">
+        <!-- Total Budget -->
+        <div class="col-xl-3 col-md-6 fade-up delay-2">
+            <div class="kpi-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <div class="kpi-label">Total Budget</div>
+                        <div class="kpi-value">@Model.TotalBudget.ToString("C0")</div>
+                        <div class="kpi-subtitle">All allocated budgets</div>
+                    </div>
+                    <div class="kpi-icon kpi-icon-navy">
+                        <i class="bi bi-bank2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Expenses -->
+        <div class="col-xl-3 col-md-6 fade-up delay-3">
+            <div class="kpi-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <div class="kpi-label">Total Expenses</div>
+                        <div class="kpi-value accent">@Model.TotalExpenses.ToString("C0")</div>
+                        <div class="kpi-subtitle">Current spending</div>
+                    </div>
+                    <div class="kpi-icon kpi-icon-tq">
+                        <i class="bi bi-receipt-cutoff"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Remaining Budget -->
+        <div class="col-xl-3 col-md-6 fade-up delay-4">
+            <div class="kpi-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <div class="kpi-label">Remaining Budget</div>
+                        @{
+                            var remaining = Model.RemainingBudget;
+                            var remainClass = remaining >= 0 ? "" : "text-danger";
+                        }
+                        <div class="kpi-value @remainClass">@remaining.ToString("C0")</div>
+                        <div class="kpi-subtitle">
+                            @if (Model.TotalBudget > 0)
+                            {
+                                var pct = Math.Round((double)(Model.TotalExpenses / Model.TotalBudget) * 100, 1);
+                                <span>@pct% utilized</span>
+                            }
+                            else
+                            {
+                                <span>No budgets yet</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="kpi-icon kpi-icon-green">
+                        <i class="bi bi-piggy-bank"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Requests -->
+        <div class="col-xl-3 col-md-6 fade-up delay-5">
+            <div class="kpi-card">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <div class="kpi-label">Pending Requests</div>
+                        <div class="kpi-value">@Model.PendingRequests</div>
+                        <div class="kpi-subtitle">Awaiting approval</div>
+                    </div>
+                    <div class="kpi-icon kpi-icon-amber">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ CHARTS ROW ═══════════ -->
+    <div class="row g-3 mb-4">
+        <!-- Bar Chart: Budget vs Expenses -->
+        <div class="col-lg-7 fade-up delay-5">
+            <div class="chart-card">
+                <div class="chart-card-title">
+                    <i class="bi bi-bar-chart-fill"></i>
+                    Budget vs Expenses by Department
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Line Chart: Monthly Expenses -->
+        <div class="col-lg-5 fade-up delay-6">
+            <div class="chart-card">
+                <div class="chart-card-title">
+                    <i class="bi bi-graph-up"></i>
+                    Monthly Expenses Trend (@DateTime.Now.Year)
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="lineChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ RECENT REQUESTS TABLE ═══════════ -->
+    <div class="activity-card fade-up delay-7 mb-4">
+        <div class="activity-header">
+            <h5>
+                <i class="bi bi-clock-history"></i>
+                Recent Budget Requests
+            </h5>
+            <a asp-controller="Workflow" asp-action="Approval" class="quick-link">
+                <i class="bi bi-arrow-right-short"></i> View All
+            </a>
+        </div>
+
+        @if (Model.RecentRequests.Any())
+        {
+            <div class="table-responsive">
+                <table class="dash-table">
+                    <thead>
+                        <tr>
+                            <th>Department</th>
+                            <th>Submitted By</th>
+                            <th>Requested Amount</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var req in Model.RecentRequests)
+                        {
+                            var badge = req.Status switch {
+                                "Approved" => "badge-approved",
+                                "Rejected" => "badge-rejected",
+                                _ => "badge-pending"
+                            };
+                            <tr>
+                                <td class="text-dept">@req.DepartmentName</td>
+                                <td>@req.SubmittedBy</td>
+                                <td class="fw-amount">@req.RequestedAmount.ToString("C2")</td>
+                                <td><span class="status-badge @badge">@req.Status</span></td>
+                                <td class="text-muted">@req.Date.ToString("MMM dd, yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="empty-state">
+                <i class="bi bi-inbox d-block"></i>
+                <p class="mb-0">No recent budget requests found.</p>
+            </div>
+        }
+    </div>
+
+</div>
+
+@section Scripts {
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // ── Shared Chart Defaults ──────────────────
+            Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
+            Chart.defaults.font.size = 12;
+            Chart.defaults.color = '#9ba8b8';
+
+            const accent = '#05828e';
+            const accentLight = 'rgba(5,130,142,0.15)';
+            const navy = '#162229';
+            const navyLight = 'rgba(22,34,41,0.12)';
+            const gridColor = 'rgba(155,168,184,0.12)';
+
+            // ── BAR CHART: Budget vs Expenses ──────────
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.BarChartLabels)),
+                    datasets: [
+                        {
+                            label: 'Budget',
+                            data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.BarChartBudgetData)),
+                            backgroundColor: navy,
+                            borderColor: navy,
+                            borderWidth: 0,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            barPercentage: 0.55,
+                            categoryPercentage: 0.65
+                        },
+                        {
+                            label: 'Expenses',
+                            data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.BarChartExpenseData)),
+                            backgroundColor: accent,
+                            borderColor: accent,
+                            borderWidth: 0,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            barPercentage: 0.55,
+                            categoryPercentage: 0.65
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            align: 'end',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'rectRounded',
+                                padding: 20,
+                                font: { weight: '600', size: 12 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: navy,
+                            titleFont: { weight: '700' },
+                            bodyFont: { size: 13 },
+                            padding: 14,
+                            cornerRadius: 10,
+                            displayColors: true,
+                            callbacks: {
+                                label: ctx => ' ' + ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString()
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { weight: '600' } }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: gridColor, drawBorder: false },
+                            border: { display: false },
+                            ticks: {
+                                callback: v => '$' + (v / 1000).toFixed(0) + 'k',
+                                font: { weight: '500' }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // ── LINE CHART: Monthly Expenses ───────────
+            const lineCtx = document.getElementById('lineChart').getContext('2d');
+            const gradient = lineCtx.createLinearGradient(0, 0, 0, 280);
+            gradient.addColorStop(0, 'rgba(5,130,142,0.18)');
+            gradient.addColorStop(1, 'rgba(5,130,142,0.0)');
+
+            new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.LineChartLabels)),
+                    datasets: [{
+                        label: 'Expenses',
+                        data: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.LineChartData)),
+                        borderColor: accent,
+                        backgroundColor: gradient,
+                        borderWidth: 2.5,
+                        pointBackgroundColor: accent,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2.5,
+                        pointRadius: 4,
+                        pointHoverRadius: 7,
+                        pointHoverBackgroundColor: accent,
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: navy,
+                            titleFont: { weight: '700' },
+                            bodyFont: { size: 13 },
+                            padding: 14,
+                            cornerRadius: 10,
+                            callbacks: {
+                                label: ctx => ' Expenses: $' + ctx.parsed.y.toLocaleString()
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { weight: '600' } }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: gridColor, drawBorder: false },
+                            border: { display: false },
+                            ticks: {
+                                callback: v => '$' + (v / 1000).toFixed(0) + 'k',
+                                font: { weight: '500' }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+}

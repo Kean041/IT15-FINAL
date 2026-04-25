@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - FinSight ERP</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+        /* ── Design Tokens ────────────────────────── */
+        :root {
+            --bg-main:    #e7eaef;
+            --bg-sidebar: #162229;
+            --bg-topbar:  #080b11;
+            --accent:     #05828e;
+            --accent-hover:#047078;
+            --muted:      #9ba8b8;
+            --text-light: #ffffff;
+            --text-body:  #2d3748;
+            --card-bg:    #ffffff;
+            --sidebar-w:  270px;
+        }
+
+        /* ── Reset ────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-main);
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: var(--text-body);
+            overflow-x: hidden;
+        }
+
+        /* ── Wrapper ──────────────────────────────── */
+        #wrapper {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ── Sidebar ──────────────────────────────── */
+        #sidebar {
+            width: var(--sidebar-w);
+            min-width: var(--sidebar-w);
+            background: var(--bg-sidebar);
+            color: var(--text-light);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 1050;
+            overflow-y: auto;
+            transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        #sidebar.collapsed {
+            transform: translateX(calc(-1 * var(--sidebar-w)));
+        }
+
+        /* Sidebar brand */
+        .sidebar-brand {
+            padding: 28px 24px 20px;
+            border-bottom: 1px solid rgba(155,168,184,0.1);
+        }
+
+        .sidebar-brand h4 {
+            margin: 0;
+            font-weight: 800;
+            font-size: 1.35rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-light);
+            letter-spacing: -0.01em;
+        }
+
+        .sidebar-brand h4 i {
+            color: var(--accent);
+            font-size: 1.5rem;
+        }
+
+        /* Sidebar nav */
+        .sidebar-nav {
+            list-style: none;
+            padding: 16px 14px;
+            margin: 0;
+            flex: 1;
+        }
+
+        .sidebar-nav li {
+            margin-bottom: 4px;
+        }
+
+        .sidebar-nav li a {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 16px;
+            font-size: 0.925rem;
+            font-weight: 500;
+            color: var(--muted);
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-nav li a i {
+            font-size: 1.2rem;
+            min-width: 22px;
+            text-align: center;
+            transition: color 0.2s;
+        }
+
+        .sidebar-nav li a:hover {
+            background: rgba(5,130,142,0.12);
+            color: var(--text-light);
+            transform: translateX(3px);
+        }
+
+        .sidebar-nav li a:hover i {
+            color: var(--accent);
+        }
+
+        .sidebar-nav li.active a {
+            background: var(--accent);
+            color: var(--text-light);
+            box-shadow: 0 4px 16px rgba(5,130,142,0.35);
+            font-weight: 600;
+        }
+
+        .sidebar-nav li.active a i {
+            color: var(--text-light);
+        }
+
+        /* Logout */
+        .sidebar-footer {
+            padding: 12px 14px 20px;
+            border-top: 1px solid rgba(155,168,184,0.1);
+        }
+
+        .sidebar-footer a {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 16px;
+            color: var(--muted);
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 0.925rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-footer a:hover {
+            background: rgba(226,109,92,0.15);
+            color: #E26D5C;
+        }
+
+        .sidebar-footer a:hover i {
+            color: #E26D5C;
+        }
+
+        /* ── Main Content Area ────────────────────── */
+        #main-content {
+            flex: 1;
+            margin-left: var(--sidebar-w);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            transition: margin-left 0.3s cubic-bezier(.4,0,.2,1);
+        }
+
+        #main-content.expanded {
+            margin-left: 0;
+        }
+
+        /* ── Topbar ───────────────────────────────── */
+        .topbar {
+            background: var(--bg-topbar);
+            padding: 0 28px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1040;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+        }
+
+        .topbar-toggle {
+            background: transparent;
+            border: 1.5px solid rgba(155,168,184,0.25);
+            color: var(--muted);
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .topbar-toggle:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(5,130,142,0.08);
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .topbar-right .notification-btn {
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            font-size: 1.2rem;
+            position: relative;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .topbar-right .notification-btn:hover {
+            color: var(--text-light);
+            background: rgba(255,255,255,0.06);
+        }
+
+        .topbar-right .notification-btn .badge-dot {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        .profile-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 16px 5px 6px;
+            border: 1.5px solid rgba(155,168,184,0.2);
+            border-radius: 50px;
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .profile-btn:hover {
+            border-color: var(--accent);
+            background: rgba(5,130,142,0.06);
+        }
+
+        .profile-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-light);
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        .profile-info {
+            text-align: left;
+        }
+
+        .profile-info .name {
+            font-size: 0.825rem;
+            font-weight: 600;
+            color: var(--text-light);
+            line-height: 1.2;
+        }
+
+        .profile-info .role {
+            font-size: 0.7rem;
+            color: var(--muted);
+            line-height: 1.2;
+        }
+
+        /* ── Page Body ────────────────────────────── */
+        .page-body {
+            flex: 1;
+            padding: 28px;
+        }
+
+        /* ── Overlay (mobile) ─────────────────────── */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(8,11,17,0.55);
+            z-index: 1045;
+            backdrop-filter: blur(2px);
+        }
+
+        .sidebar-overlay.show {
+            display: block;
+        }
+
+        /* ── Responsive ───────────────────────────── */
+        @@media (max-width: 991.98px) {
+            #sidebar {
+                transform: translateX(calc(-1 * var(--sidebar-w)));
+            }
+
+            #sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            #main-content {
+                margin-left: 0;
+            }
+        }
+
+        /* ── Dropdown Overrides ────────────────────── */
+        .dropdown-menu {
+            border: 1px solid rgba(155,168,184,0.15);
+            border-radius: 12px;
+            box-shadow: 0 12px 28px rgba(0,0,0,0.15);
+            padding: 6px;
+            overflow: hidden;
+        }
+
+        .dropdown-item {
+            border-radius: 8px;
+            padding: 9px 14px;
+            font-size: 0.875rem;
+            transition: background 0.15s;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(5,130,142,0.08);
+        }
+
+        /* ── Scrollbar ────────────────────────────── */
+        #sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #sidebar::-webkit-scrollbar-thumb {
+            background: rgba(155,168,184,0.2);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Mobile Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div id="wrapper">
+
+        <!-- ═══════════ SIDEBAR ═══════════ -->
+        <nav id="sidebar">
+            <div class="sidebar-brand mb-2 d-flex align-items-center">
+                <img src="~/images/logo.png" alt="FinSight Logo" style="height: 40px; width: auto; max-width: 100%; object-fit: contain;" />
+            </div>
+
+            @{
+                var roleId = Context.Session.GetInt32("RoleID") ?? 1;
+            }
+            <ul class="sidebar-nav">
+                <li class="active">
+                    <a asp-controller="Dashboard" asp-action="Index">
+                        <i class="bi bi-grid-fill"></i> Dashboard
+                    </a>
+                </li>
+                @* Budget Allocation: All roles can view *@
+                <li>
+                    <a asp-controller="BudgetAllocation" asp-action="Index">
+                        <i class="bi bi-cash-stack"></i> Budget Allocation
+                    </a>
+                </li>
+                @* Financial Forecasting: All roles can view *@
+                <li>
+                    <a asp-controller="Forecast" asp-action="Index">
+                        <i class="bi bi-bar-chart-line-fill"></i> Financial Forecasting
+                    </a>
+                </li>
+                @* Scenario Planning: Super Admin, Admin, Finance Manager only *@
+                @if (roleId == 0 || roleId == 1 || roleId == 2)
+                {
+                    <li>
+                        <a asp-controller="Scenario" asp-action="Planning">
+                            <i class="bi bi-diagram-3-fill"></i> Scenario Planning
+                        </a>
+                    </li>
+                }
+                @* Variance Analysis: All roles can view *@
+                <li>
+                    <a asp-controller="Variance" asp-action="Analysis">
+                        <i class="bi bi-clipboard2-data-fill"></i> Variance Analysis
+                    </a>
+                </li>
+                @* Approval Workflow: All roles can view *@
+                <li>
+                    <a asp-controller="Workflow" asp-action="Approval">
+                        <i class="bi bi-shield-check"></i> Approval Workflow
+                    </a>
+                </li>
+                @* User Management: Super Admin and Admin only *@
+                @if (roleId == 0 || roleId == 1)
+                {
+                    <li>
+                        <a asp-controller="User" asp-action="Index">
+                            <i class="bi bi-people-fill"></i> User Management
+                        </a>
+                    </li>
+                }
+            </ul>
+
+            <div class="sidebar-footer">
+                <a asp-controller="Auth" asp-action="Logout">
+                    <i class="bi bi-box-arrow-left"></i> Logout
+                </a>
+            </div>
+        </nav>
+
+        <!-- ═══════════ MAIN CONTENT ═══════════ -->
+        <div id="main-content">
+
+            <!-- Topbar -->
+            <div class="topbar">
+                <button type="button" class="topbar-toggle" id="sidebarToggle">
+                    <i class="bi bi-list fs-5"></i>
+                </button>
+
+                <div class="topbar-right">
+                    <!-- Notification bell -->
+                    <button class="notification-btn" title="Notifications">
+                        <i class="bi bi-bell"></i>
+                        <span class="badge-dot"></span>
+                    </button>
+
+                    <!-- Profile dropdown -->
+                    <div class="dropdown">
+                        <button class="profile-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            @{
+                                var fullName = Context.Session.GetString("FullName") ?? "Admin User";
+                                var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => w[0])).ToUpper();
+                            }
+                            <div class="profile-avatar">@initials</div>
+                            <div class="profile-info">
+                                <div class="name">@fullName</div>
+                                <div class="role">@(Context.Session.GetString("RoleName") ?? "Admin")</div>
+                            </div>
+                            <i class="bi bi-chevron-down text-muted ms-1" style="font-size:.7rem;"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end mt-2">
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2 text-muted"></i>My Profile</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2 text-muted"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li><a class="dropdown-item" asp-controller="Auth" asp-action="Logout" style="color:#E26D5C;"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page Content -->
+            <main class="page-body">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const sidebar  = document.getElementById('sidebar');
+            const main     = document.getElementById('main-content');
+            const toggle   = document.getElementById('sidebarToggle');
+            const overlay  = document.getElementById('sidebarOverlay');
+            const isMobile = () => window.innerWidth < 992;
+
+            toggle.addEventListener('click', function () {
+                if (isMobile()) {
+                    sidebar.classList.toggle('mobile-open');
+                    overlay.classList.toggle('show');
+                } else {
+                    sidebar.classList.toggle('collapsed');
+                    main.classList.toggle('expanded');
+                }
+            });
+
+            overlay.addEventListener('click', function () {
+                sidebar.classList.remove('mobile-open');
+                overlay.classList.remove('show');
+            });
+
+            // Active state based on current URL
+            const currentPath = window.location.pathname.toLowerCase();
+            const links = document.querySelectorAll('.sidebar-nav li');
+
+            links.forEach(li => {
+                const a = li.querySelector('a');
+                if (a) {
+                    const href = a.getAttribute('href');
+                    if (href && currentPath.startsWith(href.toLowerCase()) && href !== '/') {
+                        links.forEach(item => item.classList.remove('active'));
+                        li.classList.add('active');
+                    } else if (href === '/' && (currentPath === '/' || currentPath === '/dashboard')) {
+                        links.forEach(item => item.classList.remove('active'));
+                        li.classList.add('active');
+                    }
+                }
+            });
+        });
+    </script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,424 @@
+@model IEnumerable<FinSight.Models.Budget>
+
+@{
+    ViewData["Title"] = "Budget Allocation";
+}
+
+<style>
+   /* ── Color tokens ──────────────────────────── */
+:root {
+    --tq: #05828e;
+    --tq-dark: #047078;
+    --tq-light: rgba(5, 130, 142, 0.08);
+    --tq-glow: rgba(5, 130, 142, 0.18);
+    --navy: #162229;
+    --danger: #E26D5C;
+    --danger-dark: #c95c4d;
+}
+
+/* ── Backgrounds ───────────────────────────── */
+.bg-offwhite    { background-color: #e7eaef; }
+.bg-turquoise   { background-color: var(--tq) !important; color: #fff; }
+.text-turquoise { color: var(--tq) !important; }
+.text-navy      { color: var(--navy) !important; }
+
+/* ── Card ──────────────────────────────────── */
+.card-dashboard {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 1.25rem 1.5rem;
+    transition: box-shadow 0.2s ease;
+}
+.card-dashboard:hover {
+    box-shadow: 0 8px 24px var(--tq-glow), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Analytics Summary Cards */
+.analytics-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    padding: 20px;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    border-left: 5px solid var(--tq);
+}
+.analytics-card-navy {
+    border-left-color: var(--navy);
+}
+
+/* ── Buttons ───────────────────────────────── */
+.btn-turquoise {
+    background-color: var(--tq);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
+}
+.btn-turquoise:hover {
+    background-color: var(--tq-dark);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--tq-glow);
+}
+.btn-turquoise:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.btn-outline-turquoise {
+    color: var(--tq);
+    border: 1.5px solid var(--tq);
+    border-radius: 10px;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.btn-outline-turquoise:hover {
+    background-color: var(--tq-light);
+    color: var(--tq);
+    box-shadow: 0 0 0 3px var(--tq-glow);
+}
+
+.btn-soft-danger {
+    background-color: var(--danger);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.18s, transform 0.15s;
+}
+.btn-soft-danger:hover {
+    background-color: var(--danger-dark);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+/* ── Table ─────────────────────────────────── */
+.table thead th {
+    border-bottom: 2px solid var(--navy) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    background-color: var(--navy) !important;
+    padding: 14px 16px;
+}
+.page-item.active .page-link {
+    background-color: var(--tq);
+    border-color: var(--tq);
+    color: white;
+}
+.page-link {
+    color: var(--tq);
+}
+.table tbody td {
+    vertical-align: middle;
+    color: #2d3748;
+    padding: 13px 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+.table tbody tr {
+    transition: background 0.15s;
+}
+.table tbody tr:hover {
+    background: rgba(2, 206, 203, 0.04);
+}
+
+/* ── Status Badges ─────────────────────────── */
+.badge-approved { background-color: #d1fae5; color: #065f46; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+.badge-pending  { background-color: #fef3c7; color: #92400e; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+.badge-rejected { background-color: #fee2e2; color: #991b1b; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+</style>
+
+<div class="container-fluid px-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-navy mb-0">Budget Allocation</h2>
+            <p class="text-muted mb-0">Manage and distribute department budgets efficiently.</p>
+        </div>
+        <div>
+            <button class="btn btn-turquoise shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#createModal">
+                <i class="bi bi-plus-lg me-2"></i>New Budget
+            </button>
+        </div>
+    </div>
+
+    <!-- Analytics Summary Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Master Budget -->
+        <div class="col-md-4">
+            <div class="analytics-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Total Master Budget</h6>
+                        <h3 class="fw-bold text-navy mb-0">@(((decimal)ViewBag.MasterBudget).ToString("C0"))</h3>
+                    </div>
+                    <div class="bg-offwhite rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-bank2 text-navy fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Total Allocated -->
+        <div class="col-md-4">
+            <div class="analytics-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Currently Allocated</h6>
+                        <h3 class="fw-bold text-turquoise mb-0">@(((decimal)ViewBag.TotalAllocated).ToString("C0"))</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background: var(--tq-light); width: 48px; height: 48px;">
+                        <i class="bi bi-bar-chart-line text-turquoise fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Departments Count -->
+        <div class="col-md-4">
+            <div class="analytics-card analytics-card-navy">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Departments Count</h6>
+                        <h3 class="fw-bold text-navy mb-0">@ViewBag.TotalDepartmentsCount</h3>
+                    </div>
+                    <div class="bg-offwhite rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-diagram-3 text-navy fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table Card wrapper includes the search/filter header -->
+    <div class="card card-dashboard mb-4 mt-2">
+        
+        <!-- Horizontally Aligned Search and Fill Section -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-navy mb-0 ps-2"><i class="bi bi-table me-2 text-turquoise"></i>Budget Records</h5>
+            
+            <form asp-action="Index" method="get" class="d-flex align-items-center">
+                <!-- Dropdown Filter -->
+                <select name="periodFilter" class="form-select border-0 bg-offwhite shadow-sm me-2 rounded-3 text-secondary fw-medium" style="width: auto; cursor: pointer;">
+                    <option value="" selected="@(string.IsNullOrEmpty(ViewBag.CurrentPeriod) ? "selected" : null)">All Time</option>
+                    <option value="Day" selected="@(ViewBag.CurrentPeriod == "Day" ? "selected" : null)">Today</option>
+                    <option value="Week" selected="@(ViewBag.CurrentPeriod == "Week" ? "selected" : null)">This Week</option>
+                    <option value="Month" selected="@(ViewBag.CurrentPeriod == "Month" ? "selected" : null)">This Month</option>
+                </select>
+
+                <!-- Search Input Group -->
+                <div class="input-group shadow-sm bg-offwhite rounded-3 border-0 overflow-hidden" style="width: 280px;">
+                    <span class="input-group-text border-0 bg-transparent text-turquoise"><i class="bi bi-search"></i></span>
+                    <input type="text" name="searchString" value="@ViewBag.CurrentSearch" class="form-control border-0 shadow-none bg-transparent" placeholder="Search..." />
+                </div>
+
+                <button type="submit" class="btn btn-turquoise ms-2 rounded-3 px-3 shadow-sm fw-semibold">Search</button>
+                    
+                @if (!string.IsNullOrEmpty(ViewBag.CurrentSearch) || !string.IsNullOrEmpty(ViewBag.CurrentPeriod))
+                {
+                    <a asp-action="Index" class="btn btn-light ms-2 rounded-3 text-danger shadow-sm"><i class="bi bi-x-circle"></i></a>
+                }
+            </form>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive rounded-top-3">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-navy text-white">
+                        <tr>
+                            <th class="ps-4">Department</th>
+                            <th>Category</th>
+                            <th>Amount ($)</th>
+                            <th>Year</th>
+                            <th>Status</th>
+                            <th>Created By</th>
+                            <th>Date</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if(Model != null && Model.Any())
+                        {
+                            foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td class="ps-4 fw-semibold text-turquoise">@item.Department?.DepartmentName</td>
+                                    <td>@item.Category</td>
+                                    <td class="fw-bold">@item.Amount.ToString("N2")</td>
+                                    <td>@item.Year</td>
+                                    <td>
+                                        @{
+                                            var badgeClass = item.Status switch {
+                                                "Active" => "badge-approved",
+                                                "Draft" => "badge-pending",
+                                                "Closed" => "badge-rejected",
+                                                "Approved" => "badge-approved", // fallback
+                                                "Pending" => "badge-pending",   // fallback
+                                                _ => "badge-rejected"
+                                            };
+                                        }
+                                        <span class="badge @badgeClass">@item.Status</span>
+                                    </td>
+                                    <td class="text-secondary small">@item.Creator?.FullName</td>
+                                    <td class="text-secondary small">@item.CreatedAt.ToString("MMM dd, yyyy")</td>
+                                    <td class="text-end pe-4">
+                                        <button class="btn btn-sm btn-outline-turquoise me-1 " 
+                                                onclick="openEditModal(@item.BudgetID, '@(item.Department?.DepartmentName?.Replace("'", "\\'") ?? "")', '@item.Category.Replace("'", "\\'")', @item.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture), @item.Year, '@item.Status')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form asp-action="Delete" asp-route-id="@item.BudgetID" method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this budget?');">
+                                            <button type="submit" class="btn btn-sm btn-soft-danger ">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="bi bi-folder-x fs-1 d-block mb-3 text-turquoise"></i>
+                                    No records found matching your filters.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination Controls -->
+            @if (ViewBag.TotalPages != null && ViewBag.TotalPages > 1)
+            {
+                <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-white" style="border-radius: 0 0 16px 16px;">
+                    <span class="text-muted small fw-medium">Showing Page @ViewBag.CurrentPage of @ViewBag.TotalPages</span>
+                    <ul class="pagination pagination-sm mb-0 shadow-sm">
+                        @for (int i = 1; i <= ViewBag.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == ViewBag.CurrentPage ? "active" : "")">
+                                <a class="page-link" asp-action="Index" asp-route-page="@i" asp-route-searchString="@ViewBag.CurrentSearch" asp-route-periodFilter="@ViewBag.CurrentPeriod">@i</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- CREATE MODAL -->
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-turquoise border-0">
+                <h5 class="modal-title fw-bold" id="createModalLabel"><i class="bi bi-wallet2 me-2"></i>Allocate New Budget</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Create" method="post">
+                <div class="modal-body bg-offwhite p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Department</label>
+                        <input list="departmentList" name="DepartmentName" class="form-control shadow-sm border-0" placeholder="Select or type department..." required autocomplete="off" />
+                        <datalist id="departmentList">
+                            @foreach(var dept in ViewBag.Departments)
+                            {
+                                <option value="@dept.Text"></option>
+                            }
+                        </datalist>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Category</label>
+                        <input type="text" name="Category" class="form-control shadow-sm border-0" placeholder="e.g. Q4 Ad Spend" required />
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Amount ($)</label>
+                            <input type="number" name="Amount" step="0.01" min="0" class="form-control shadow-sm border-0" placeholder="0.00" required />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Year</label>
+                            <input type="number" name="Year" value="@DateTime.Now.Year" class="form-control shadow-sm border-0" required />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Status</label>
+                        <select name="Status" asp-items="ViewBag.Statuses" class="form-select shadow-sm border-0" required></select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-offwhite pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-light shadow-sm fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-turquoise shadow-sm px-4">Save Budget</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-turquoise border-0">
+                <h5 class="modal-title fw-bold" id="editModalLabel"><i class="bi bi-pencil-square me-2"></i>Edit Budget Allocation</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Edit" method="post" id="editForm">
+                <!-- Data will be appended to the form action via Javascript -->
+                <div class="modal-body bg-offwhite p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Department</label>
+                        <input list="departmentList" name="DepartmentName" id="editDept" class="form-control shadow-sm border-0" placeholder="Select or type department..." required autocomplete="off" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Category</label>
+                        <input type="text" name="Category" id="editCategory" class="form-control shadow-sm border-0" required />
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Amount ($)</label>
+                            <input type="number" name="Amount" id="editAmount" step="0.01" min="0" class="form-control shadow-sm border-0" required />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Year</label>
+                            <input type="number" name="Year" id="editYear" class="form-control shadow-sm border-0" required />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Status</label>
+                        <select name="Status" id="editStatus" asp-items="ViewBag.Statuses" class="form-select shadow-sm border-0" required></select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-offwhite pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-light shadow-sm fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-turquoise shadow-sm px-4">Update Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Minimal Vanilla Javascript for the Modals
+    function openEditModal(id, deptName, category, amount, year, status) {
+        document.getElementById('editForm').action = '/BudgetAllocation/Edit/' + id;
+        document.getElementById('editDept').value = deptName;
+        document.getElementById('editCategory').value = category;
+        document.getElementById('editAmount').value = amount;
+        document.getElementById('editYear').value = year;
+        document.getElementById('editStatus').value = status;
+        
+        var editModalElement = document.getElementById('editModal');
+        var editModalInstance = new bootstrap.Modal(editModalElement);
+        editModalInstance.show();
+    }
+</script>

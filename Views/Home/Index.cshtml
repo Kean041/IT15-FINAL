@@ -1,0 +1,473 @@
+@{
+    Layout = null;
+    ViewData["Title"] = "FinSight ERP - Smart Financial Insights";
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --fs-bg: #e7eaef;
+            --fs-secondary: #9ba8b8;
+            --fs-primary: #05828e;
+            --fs-primary-hover: #046b75;
+            --fs-card: #162229;
+            --fs-header: #080b11;
+            --fs-text-light: #ffffff;
+            --fs-text-dark: #162229;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--fs-bg);
+            color: var(--fs-text-dark);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ────── HEADER / NAVBAR ────── */
+        .navbar {
+            background-color: var(--fs-header);
+            padding: 1rem 0;
+            transition: all 0.3s ease;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            color: var(--fs-text-light) !important;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .navbar-brand i { color: var(--fs-primary); }
+        .nav-link { color: var(--fs-secondary) !important; font-weight: 500; transition: color 0.3s; }
+        .nav-link:hover { color: var(--fs-text-light) !important; }
+        .nav-link.active { color: var(--fs-primary) !important; }
+
+        .btn-outline-login {
+            color: var(--fs-text-light);
+            border: 1px solid var(--fs-secondary);
+            border-radius: 8px;
+            padding: 0.35rem 1.25rem;
+            transition: all 0.3s;
+        }
+        .btn-outline-login:hover {
+            border-color: var(--fs-text-light);
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--fs-text-light);
+        }
+
+        /* ────── HERO SECTION ────── */
+        .hero-section {
+            background-color: var(--fs-header);
+            padding: 6rem 0 7rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Subtle glow effect behind hero text */
+        .hero-glow {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: var(--fs-primary);
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.2;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-title {
+            color: var(--fs-text-light);
+            font-size: 3.5rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+        }
+        
+        .hero-title span { color: var(--fs-primary); }
+        
+        .hero-subtitle {
+            color: var(--fs-secondary);
+            font-size: 1.15rem;
+            line-height: 1.6;
+            margin-bottom: 2.5rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .btn-primary-action {
+            background-color: var(--fs-primary);
+            color: var(--fs-text-light);
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            font-size: 1.05rem;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(5, 130, 142, 0.3);
+        }
+
+        .btn-primary-action:hover {
+            background-color: var(--fs-primary-hover);
+            color: var(--fs-text-light);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(5, 130, 142, 0.4);
+        }
+
+        /* ────── FEATURES SECTION ────── */
+        .features-section {
+            padding: 5rem 0;
+            background-color: var(--fs-bg);
+        }
+        
+        .section-title {
+            color: var(--fs-header);
+            font-weight: 700;
+            margin-bottom: 3rem;
+            text-align: center;
+            font-size: 2.2rem;
+        }
+
+        .feature-card {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 2rem;
+            height: 100%;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        .feature-icon-box {
+            width: 54px;
+            height: 54px;
+            background-color: rgba(5, 130, 142, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .feature-icon-box i {
+            font-size: 1.5rem;
+            color: var(--fs-primary);
+        }
+
+        .feature-title {
+            font-weight: 600;
+            color: var(--fs-card);
+            margin-bottom: 0.75rem;
+            font-size: 1.25rem;
+        }
+
+        .feature-desc {
+            color: var(--fs-secondary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* ────── PRICING SECTION ────── */
+        .pricing-section {
+            padding: 5rem 0 6rem;
+            background-color: var(--fs-card); /* Dark segment */
+        }
+
+        .pricing-section .section-title {
+            color: var(--fs-text-light);
+        }
+
+        .pricing-section .section-subtitle {
+            color: var(--fs-secondary);
+            text-align: center;
+            max-width: 600px;
+            margin: -2rem auto 3rem;
+        }
+
+        .pricing-card {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(155, 168, 184, 0.2);
+            border-radius: 16px;
+            padding: 2.5rem 2rem;
+            height: 100%;
+            color: var(--fs-text-light);
+            transition: all 0.3s;
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--fs-primary);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .pricing-card.popular {
+            border-color: var(--fs-primary);
+            background-color: rgba(5, 130, 142, 0.05);
+        }
+
+        .popular-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--fs-primary);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.25rem 1rem;
+            border-radius: 20px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .plan-name { font-weight: 600; font-size: 1.25rem; margin-bottom: 0.5rem; color: var(--fs-secondary); }
+        .plan-price { font-size: 3rem; font-weight: 700; margin-bottom: 1.5rem; color: #fff; }
+        .plan-price span { font-size: 1rem; font-weight: 400; color: var(--fs-secondary); }
+        
+        .plan-features { list-style: none; padding: 0; margin-bottom: 2.5rem; }
+        .plan-features li {
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            color: #d1d5db;
+        }
+        .plan-features li i { color: var(--fs-primary); font-size: 1.1rem; }
+        
+        .btn-choose-plan {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.9rem;
+        }
+
+        .btn-choose-light {
+            background-color: transparent;
+            border: 1px solid var(--fs-secondary);
+            color: var(--fs-text-light);
+        }
+        
+        .btn-choose-light:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-color: #fff;
+        }
+
+        .btn-choose-primary {
+            background-color: var(--fs-primary);
+            border: 1px solid var(--fs-primary);
+            color: white;
+        }
+
+        .btn-choose-primary:hover {
+            background-color: var(--fs-primary-hover);
+            color: white;
+        }
+
+        /* ────── FOOTER ────── */
+        footer {
+            background-color: var(--fs-header);
+            padding: 3rem 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--fs-secondary);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <img src="~/images/logo.png" alt="FinSight Logo" style="height: 45px; object-fit: contain;" />
+            </a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <i class="bi bi-list text-white fs-2"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav mx-auto">
+                    <li class="nav-item"><a class="nav-link active" href="#">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#pricing">Pricing</a></li>
+                </ul>
+                <div class="d-flex gap-3">
+                    <a asp-controller="Auth" asp-action="Login" class="btn btn-outline-login text-decoration-none">Log in</a>
+                    <a href="#pricing" class="btn btn-primary-action text-decoration-none py-1 px-3 d-flex align-items-center">Sign up</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HERO SECTION -->
+    <section class="hero-section text-center">
+        <div class="hero-glow"></div>
+        <div class="container hero-content">
+            <h1 class="hero-title">Intelligent Financial<br>Planning & <span>Control</span></h1>
+            <p class="hero-subtitle">
+                A powerful SaaS ERP platform replacing scattered spreadsheets with unified Budget Allocation, Forecasting, and Scenario Planning for growing enterprises.
+            </p>
+            <a href="#pricing" class="btn btn-primary-action btn-lg text-decoration-none">
+                Start Managing Your Finances <i class="bi bi-arrow-right ms-2"></i>
+            </a>
+        </div>
+    </section>
+
+    <!-- FEATURES SECTION -->
+    <section id="features" class="features-section">
+        <div class="container">
+            <h2 class="section-title">Core ERP Modules</h2>
+            <div class="row g-4">
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon-box"><i class="bi bi-pie-chart-fill"></i></div>
+                        <h3 class="feature-title">Budget Allocation</h3>
+                        <p class="feature-desc">Dynamically securely allocate funds across departments. Establish hard budget limits synchronized dynamically across actuals.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon-box"><i class="bi bi-graph-up-arrow"></i></div>
+                        <h3 class="feature-title">Financial Forecasting</h3>
+                        <p class="feature-desc">Predictive modeling leveraging historical ERP data. Visualize future runway efficiently eliminating blind guesswork.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon-box"><i class="bi bi-shuffle"></i></div>
+                        <h3 class="feature-title">Scenario Planning</h3>
+                        <p class="feature-desc">Model best-case, worst-case, and baseline revenue models effortlessly. Toggle scenarios quickly from the dashboard.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon-box"><i class="bi bi-bar-chart-steps"></i></div>
+                        <h3 class="feature-title">Variance Analysis</h3>
+                        <p class="feature-desc">Identify immediate discrepancies between forecasted expectations and ground-truth financial facts visually.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon-box"><i class="bi bi-shield-check"></i></div>
+                        <h3 class="feature-title">Budget Approval Workflow</h3>
+                        <p class="feature-desc">Native multi-level role authorization pipelines securing funding requests and budget allocations directly securely.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon-box"><i class="bi bi-people-fill"></i></div>
+                        <h3 class="feature-title">SaaS User Management</h3>
+                        <p class="feature-desc">Full multi-tenant siloing. Dedicated system roles vs business logic roles securely handled behind advanced RBAC layers.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PRICING SECTION -->
+    <section id="pricing" class="pricing-section">
+        <div class="container">
+            <h2 class="section-title">Select Your Subscription Plan</h2>
+            <p class="section-subtitle">Flexible tiers designed to strictly silo your internal organization while supporting infinite scalability for high volume analysis.</p>
+            
+            <div class="row justify-content-center g-4 mt-2">
+                <!-- Basic Plan -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="pricing-card">
+                        <h3 class="plan-name">Basic</h3>
+                        <div class="plan-price">$29<span>/mo</span></div>
+                        <ul class="plan-features">
+                            <li><i class="bi bi-check2"></i> 1 Admin + 3 Users</li>
+                            <li><i class="bi bi-check2"></i> Basic Budget Allocation</li>
+                            <li><i class="bi bi-check2"></i> Essential User Management</li>
+                            <li><i class="bi bi-dash" style="color:var(--fs-secondary)"></i> No Scenario Planning</li>
+                        </ul>
+                        <!-- Passes "Basic" to the Register view -->
+                        <a href="/Auth/Register?plan=Basic" class="btn btn-choose-plan btn-choose-light text-decoration-none d-block text-center mt-auto">Choose Plan</a>
+                    </div>
+                </div>
+
+                <!-- Premium Plan -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="pricing-card popular">
+                        <div class="popular-badge">Most Popular</div>
+                        <h3 class="plan-name" style="color: var(--fs-primary)">Premium</h3>
+                        <div class="plan-price">$79<span>/mo</span></div>
+                        <ul class="plan-features">
+                            <li><i class="bi bi-check2"></i> 1 Admin + 15 Users</li>
+                            <li><i class="bi bi-check2"></i> Advanced Financial Forecasting</li>
+                            <li><i class="bi bi-check2"></i> Unlimited Scenario Planning</li>
+                            <li><i class="bi bi-check2"></i> Simple Approval Workflows</li>
+                        </ul>
+                        <!-- Passes "Premium" to the Register view -->
+                        <a href="/Auth/Register?plan=Premium" class="btn btn-choose-plan btn-choose-primary text-decoration-none d-block text-center mt-auto">Choose Plan</a>
+                    </div>
+                </div>
+
+                <!-- Enterprise Plan -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="pricing-card">
+                        <h3 class="plan-name">Enterprise</h3>
+                        <div class="plan-price">$299<span>/mo</span></div>
+                        <ul class="plan-features">
+                            <li><i class="bi bi-check2"></i> Unlimited Admin & Users</li>
+                            <li><i class="bi bi-check2"></i> Real-time Variance Analysis</li>
+                            <li><i class="bi bi-check2"></i> Advanced Multi-tier Approvals</li>
+                            <li><i class="bi bi-check2"></i> 24/7 Dedicated Support</li>
+                        </ul>
+                        <!-- Passes "Enterprise" to the Register view -->
+                        <a href="/Auth/Register?plan=Enterprise" class="btn btn-choose-plan btn-choose-light text-decoration-none d-block text-center mt-auto">Choose Plan</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container text-center">
+            <div class="mb-3 mt-2">
+                <img src="~/images/logo.png" alt="FinSight Logo" style="height: 50px;" />
+            </div>
+            <p class="small mb-0">© @DateTime.Now.Year FinSight Enterprise Solutions. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

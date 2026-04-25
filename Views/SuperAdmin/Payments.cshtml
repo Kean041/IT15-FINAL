@@ -1,0 +1,405 @@
+@model FinSight.Models.ViewModels.SuperAdminPaymentViewModel
+
+@{
+    Layout = "_SuperAdminLayout";
+    ViewData["Title"] = "Global Payments";
+}
+
+<style>
+/* ── Color tokens ──────────────────────────── */
+:root {
+    --tq: #05828e;
+    --tq-dark: #047078;
+    --tq-light: rgba(5, 130, 142, 0.08);
+    --tq-glow: rgba(5, 130, 142, 0.18);
+    --navy: #162229;
+    --danger: #E26D5C;
+    --danger-dark: #c95c4d;
+    --success: #10b981;
+    --success-light: rgba(16, 185, 129, 0.08);
+    --warning: #f59e0b;
+    --warning-light: rgba(245, 158, 11, 0.08);
+    --muted-color: #9ba8b8;
+}
+
+/* ── Backgrounds & Text ────────────────────── */
+.bg-offwhite    { background-color: #e7eaef; }
+.bg-turquoise   { background-color: var(--tq) !important; color: #fff; }
+.text-turquoise { color: var(--tq) !important; }
+.text-navy      { color: var(--navy) !important; }
+.border-muted   { border-color: var(--muted-color) !important; }
+
+/* ── Cards ─────────────────────────────────── */
+.card-dashboard {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 1.25rem 1.5rem;
+    transition: box-shadow 0.2s ease;
+}
+.card-dashboard:hover {
+    box-shadow: 0 8px 24px var(--tq-glow), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.analytics-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    padding: 20px;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    border-left: 5px solid var(--tq);
+}
+.analytics-card-navy    { border-left-color: var(--navy); }
+.analytics-card-success { border-left-color: var(--success); }
+.analytics-card-danger  { border-left-color: var(--danger); }
+
+/* ── Buttons ───────────────────────────────── */
+.btn-turquoise {
+    background-color: var(--tq);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
+}
+.btn-turquoise:hover {
+    background-color: var(--tq-dark);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--tq-glow);
+}
+
+.btn-outline-turquoise {
+    color: var(--tq);
+    border: 1.5px solid var(--tq);
+    border-radius: 10px;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.btn-outline-turquoise:hover {
+    background-color: var(--tq-light);
+    color: var(--tq);
+    box-shadow: 0 0 0 3px var(--tq-glow);
+}
+
+/* ── Table ─────────────────────────────────── */
+.table thead th {
+    border-bottom: 2px solid var(--muted-color) !important;
+    color: var(--navy) !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    background-color: transparent !important;
+    padding: 14px 16px;
+}
+.table tbody td {
+    vertical-align: middle;
+    color: #2d3748;
+    padding: 13px 16px;
+    border-bottom: 1px solid rgba(155, 168, 184, 0.2);
+}
+.table tbody tr {
+    transition: background 0.15s;
+}
+.table tbody tr:hover {
+    background: rgba(5, 130, 142, 0.04);
+}
+
+/* ── Status Badges ─────────────────────────── */
+.badge-paid    { background-color: #d1fae5; color: #065f46; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
+.badge-pending { background-color: #fef3c7; color: #92400e; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
+.badge-failed  { background-color: #fee2e2; color: #991b1b; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
+
+/* ── Forms/Inputs ──────────────────────────── */
+.form-control, .form-select {
+    border: 1px solid rgba(155, 168, 184, 0.5);
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--tq);
+    box-shadow: 0 0 0 0.25rem var(--tq-glow);
+}
+</style>
+
+<div class="container-fluid px-0">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-navy mb-0">Payments & Transactions</h2>
+            <p class="text-muted mb-0">Monitor billing and subscription revenue across all tenants.</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-turquoise shadow-sm px-4 py-2">
+                <i class="bi bi-download me-2"></i>Export Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Analytics Summary Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Total Revenue -->
+        <div class="col-md-3">
+            <div class="analytics-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Total Revenue</h6>
+                        <h3 class="fw-bold text-navy mb-0">@Model.TotalRevenue.ToString("C2")</h3>
+                    </div>
+                    <div class="bg-offwhite rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-cash-stack text-turquoise fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Total Transactions -->
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-navy">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Transactions</h6>
+                        <h3 class="fw-bold text-navy mb-0">@Model.TotalTransactions</h3>
+                    </div>
+                    <div class="bg-offwhite rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-receipt text-navy fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Successful Payments -->
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-success">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Successful</h6>
+                        <h3 class="fw-bold text-success mb-0">@Model.SuccessfulPayments</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background: var(--success-light); width: 48px; height: 48px;">
+                        <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Failed Payments -->
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-danger">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Failed</h6>
+                        <h3 class="fw-bold text-danger mb-0">@Model.FailedPayments</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background: rgba(226, 109, 92, 0.1); width: 48px; height: 48px;">
+                        <i class="bi bi-x-circle-fill text-danger fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="card card-dashboard mb-4 mt-2">
+
+        <!-- Search & Filters -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
+            <h5 class="fw-bold text-navy mb-0 ps-2"><i class="bi bi-credit-card-2-front-fill me-2 text-turquoise"></i>Payment Records</h5>
+
+            <form asp-action="Payments" method="get" class="d-flex align-items-center gap-2 flex-wrap">
+                <!-- Status Filter -->
+                <select name="statusFilter" class="form-select rounded-3 shadow-sm" style="width: 140px;">
+                    <option value="" selected="@(string.IsNullOrEmpty(Model.StatusFilter) ? "selected" : null)">All Statuses</option>
+                    <option value="Paid" selected="@(Model.StatusFilter == "Paid" ? "selected" : null)">Paid</option>
+                    <option value="Pending" selected="@(Model.StatusFilter == "Pending" ? "selected" : null)">Pending</option>
+                    <option value="Failed" selected="@(Model.StatusFilter == "Failed" ? "selected" : null)">Failed</option>
+                </select>
+
+                <!-- Date Filter -->
+                <select name="dateRangeFilter" class="form-select rounded-3 shadow-sm" style="width: 150px;">
+                    <option value="" selected="@(string.IsNullOrEmpty(Model.DateRangeFilter) ? "selected" : null)">All Time</option>
+                    <option value="Today" selected="@(Model.DateRangeFilter == "Today" ? "selected" : null)">Today</option>
+                    <option value="ThisWeek" selected="@(Model.DateRangeFilter == "ThisWeek" ? "selected" : null)">This Week</option>
+                    <option value="ThisMonth" selected="@(Model.DateRangeFilter == "ThisMonth" ? "selected" : null)">This Month</option>
+                </select>
+
+                <!-- Search Input -->
+                <div class="input-group shadow-sm rounded-3 overflow-hidden" style="width: 250px;">
+                    <span class="input-group-text bg-white border-muted text-turquoise"><i class="bi bi-search"></i></span>
+                    <input type="text" name="searchString" value="@Model.SearchString" class="form-control border-muted border-start-0 shadow-none" placeholder="Search company..." />
+                </div>
+                
+                <button type="submit" class="btn btn-turquoise rounded-3 px-3 shadow-sm fw-semibold">Search</button>
+                @if (!string.IsNullOrEmpty(Model.SearchString) || !string.IsNullOrEmpty(Model.StatusFilter) || !string.IsNullOrEmpty(Model.DateRangeFilter))
+                {
+                    <a asp-action="Payments" class="btn btn-light rounded-3 text-danger shadow-sm"><i class="bi bi-x-circle"></i> Clear</a>
+                }
+            </form>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive rounded-top-3">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Tenant / Company</th>
+                            <th>Plan</th>
+                            <th>Amount</th>
+                            <th>Method</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Payments != null && Model.Payments.Any())
+                        {
+                            foreach (var payment in Model.Payments)
+                            {
+                                var statusBadge = payment.Status.ToLower() switch
+                                {
+                                    "paid" => "badge-paid",
+                                    "pending" => "badge-pending",
+                                    "failed" => "badge-failed",
+                                    _ => "badge-pending"
+                                };
+
+                                <tr>
+                                    <td class="ps-4 fw-semibold text-navy">@payment.TenantName</td>
+                                    <td class="text-secondary">@payment.PlanName</td>
+                                    <td class="fw-bold">@payment.AmountPaid.ToString("C2")</td>
+                                    <td class="text-secondary">
+                                        <i class="bi bi-credit-card me-1 text-muted"></i> @payment.PaymentMethod
+                                    </td>
+                                    <td><span class="badge @statusBadge">@payment.Status</span></td>
+                                    <td class="text-secondary small">@payment.TransactionDate.ToString("MMM dd, yyyy HH:mm")</td>
+                                    <td class="text-end pe-4">
+                                        <button class="btn btn-sm btn-outline-turquoise px-3" 
+                                                onclick="openDetailsModal('@payment.PaymentID', '@payment.TenantName', '@payment.PlanName', '@payment.AmountPaid.ToString("C2")', '@payment.PaymentMethod', '@payment.Status', '@payment.ReferenceID', '@payment.TransactionDate.ToString("MMM dd, yyyy HH:mm")')"
+                                                title="View Details">
+                                            View Details
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="bi bi-receipt fs-1 d-block mb-3 text-turquoise"></i>
+                                    No payment records found.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            @if (Model.TotalPages > 1)
+            {
+                <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-white" style="border-radius: 0 0 16px 16px;">
+                    <span class="text-muted small fw-medium">Showing Page @Model.CurrentPage of @Model.TotalPages</span>
+                    <ul class="pagination pagination-sm mb-0 shadow-sm">
+                        @for (int i = 1; i <= Model.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                                <a class="page-link" asp-action="Payments" asp-route-page="@i" asp-route-searchString="@Model.SearchString" asp-route-statusFilter="@Model.StatusFilter" asp-route-dateRangeFilter="@Model.DateRangeFilter">@i</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ PAYMENT DETAILS MODAL ═══════════ -->
+<div class="modal fade" id="paymentDetailsModal" tabindex="-1" aria-labelledby="paymentDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header border-0" style="background:#080b11;">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle"
+                         style="width:38px;height:38px;background:rgba(5, 130, 142, 0.15);">
+                        <i class="bi bi-receipt-cutoff" style="color:var(--tq);"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-white mb-0" id="paymentDetailsModalLabel">Payment Details</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="background:#fff;">
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-muted" style="border-bottom-style: dashed !important;">
+                    <div>
+                        <h4 class="fw-bold text-navy mb-1" id="modalAmount">$0.00</h4>
+                        <span class="badge badge-paid" id="modalStatus">Status</span>
+                    </div>
+                    <div class="text-end">
+                        <p class="text-muted small mb-0">Transaction Date</p>
+                        <p class="fw-semibold text-navy mb-0" id="modalDate">Jan 01, 2026</p>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-5 text-muted small fw-medium">Tenant / Company</div>
+                    <div class="col-7 fw-semibold text-navy text-end" id="modalTenant">Company Name</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-5 text-muted small fw-medium">Subscription Plan</div>
+                    <div class="col-7 fw-semibold text-navy text-end" id="modalPlan">Plan Name</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-5 text-muted small fw-medium">Payment Method</div>
+                    <div class="col-7 fw-semibold text-navy text-end" id="modalMethod">Method</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-5 text-muted small fw-medium">Reference ID</div>
+                    <div class="col-7 text-end">
+                        <span class="bg-offwhite px-2 py-1 rounded border border-muted small font-monospace text-navy" id="modalRef">REF_ID</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-0" style="background:#fff;">
+                <button type="button" class="btn btn-light fw-semibold shadow-sm w-100" data-bs-dismiss="modal" style="border-radius:10px;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openDetailsModal(id, tenant, plan, amount, method, status, ref, date) {
+        // Populate modal data
+        document.getElementById('modalAmount').innerText = amount;
+        document.getElementById('modalDate').innerText = date;
+        document.getElementById('modalTenant').innerText = tenant;
+        document.getElementById('modalPlan').innerText = plan;
+        document.getElementById('modalMethod').innerText = method;
+        document.getElementById('modalRef').innerText = ref;
+
+        // Set status badge styling
+        const statusBadge = document.getElementById('modalStatus');
+        statusBadge.innerText = status;
+        statusBadge.className = 'badge'; // reset classes
+        
+        const statusLower = status.toLowerCase();
+        if (statusLower === 'paid') {
+            statusBadge.classList.add('badge-paid');
+        } else if (statusLower === 'pending') {
+            statusBadge.classList.add('badge-pending');
+        } else if (statusLower === 'failed') {
+            statusBadge.classList.add('badge-failed');
+        } else {
+            statusBadge.classList.add('badge-pending');
+        }
+
+        // Show modal
+        var modal = new bootstrap.Modal(document.getElementById('paymentDetailsModal'));
+        modal.show();
+    }
+</script>
+}

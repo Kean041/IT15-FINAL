@@ -1,0 +1,95 @@
+@model FinSight.Models.ViewModels.RegisterViewModel
+@{
+    Layout = "~/Views/Shared/_IdentityLayout.cshtml";
+    ViewData["Title"] = "Create Account";
+}
+
+<div class="auth-title">Create an Account</div>
+<div class="auth-subtitle">Join us today and streamline your operations.</div>
+
+<!-- Validation Summary -->
+<div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+<form asp-action="Register" asp-controller="Auth" method="post">
+    @Html.AntiForgeryToken()
+
+    <!-- Plan (hidden if present) -->
+    @if (!string.IsNullOrEmpty(Model?.Plan))
+    {
+        <input type="hidden" asp-for="Plan" />
+        <div class="mb-3">
+            <label class="form-label">Selected Plan</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-star-fill" style="color: #f59e0b;"></i></span>
+                <input type="text" class="form-control fw-bold" value="@Model.Plan" readonly style="background-color: var(--bg-page);">
+            </div>
+        </div>
+    }
+
+    <!-- Company Name Field -->
+    <div class="mb-3">
+        <label asp-for="CompanyName" class="form-label">Company Name</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-building"></i></span>
+            <input asp-for="CompanyName" class="form-control" placeholder="Acme Corporation" />
+        </div>
+        <span asp-validation-for="CompanyName" class="field-validation-error"></span>
+    </div>
+
+    <!-- Full Name Field -->
+    <div class="mb-3">
+        <label asp-for="FullName" class="form-label">Full Name</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-person"></i></span>
+            <input asp-for="FullName" class="form-control" placeholder="John Doe" />
+        </div>
+        <span asp-validation-for="FullName" class="field-validation-error"></span>
+    </div>
+
+    <!-- Email Field -->
+    <div class="mb-3">
+        <label asp-for="Email" class="form-label">Business Email</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+            <input asp-for="Email" class="form-control" placeholder="name@company.com" />
+        </div>
+        <span asp-validation-for="Email" class="field-validation-error"></span>
+    </div>
+
+    <!-- Password Field -->
+    <div class="mb-3">
+        <label asp-for="Password" class="form-label">Password</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+            <input asp-for="Password" class="form-control" placeholder="Create a strong password" />
+            <span class="input-group-text password-toggle" onclick="togglePassword('Password', this)">
+                <i class="bi bi-eye-slash"></i>
+            </span>
+        </div>
+        <span asp-validation-for="Password" class="field-validation-error"></span>
+    </div>
+
+    <!-- Confirm Password Field -->
+    <div class="mb-4">
+        <label asp-for="ConfirmPassword" class="form-label">Confirm Password</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-shield-check"></i></span>
+            <input asp-for="ConfirmPassword" class="form-control" placeholder="Repeat your password" />
+            <span class="input-group-text password-toggle" onclick="togglePassword('ConfirmPassword', this)">
+                <i class="bi bi-eye-slash"></i>
+            </span>
+        </div>
+        <span asp-validation-for="ConfirmPassword" class="field-validation-error"></span>
+    </div>
+
+    <!-- Register Button -->
+    <button type="submit" class="btn btn-primary w-100 py-2 mb-4">
+        Create Account <i class="bi bi-arrow-right ms-2"></i>
+    </button>
+
+    <!-- Login Link -->
+    <div class="text-center small" style="color: var(--text-muted);">
+        Already have an account?
+        <a asp-controller="Auth" asp-action="Login" class="fw-bold ms-1" style="color: var(--primary);">Login</a>
+    </div>
+</form>

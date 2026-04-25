@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - FinSight</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --primary:       #05828e;
+            --primary-hover: #046973;
+            --primary-light: rgba(5, 130, 142, 0.08);
+            --primary-glow:  rgba(5, 130, 142, 0.25);
+            --bg-page:       #e7eaef;
+            --text-heading:  #080b11;
+            --text-body:     #162229;
+            --text-muted:    #9ba8b8;
+            --border-color:  #9ba8b8;
+            --border-focus:  #05828e;
+            --input-bg:      #ffffff;
+            --left-panel-bg: #162229;
+            --radius-container: 20px;
+            --radius-input:  10px;
+            --radius-btn:    10px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: var(--text-body);
+            background: var(--bg-page);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 1050px;
+            background: #ffffff;
+            border-radius: var(--radius-container);
+            box-shadow: 0 16px 48px rgba(8, 11, 17, 0.12);
+            display: flex;
+            overflow: hidden;
+            margin: 2rem;
+            min-height: 650px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @@keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Left Branding Panel ── */
+        .auth-left {
+            flex: 5;
+            background: linear-gradient(145deg, var(--left-panel-bg), #0f171d);
+            padding: 3.5rem;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Abstract UI Elements */
+        .auth-left::before {
+            content: '';
+            position: absolute;
+            top: -120px;
+            right: -80px;
+            width: 350px;
+            height: 350px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--primary) 0%, transparent 60%);
+            opacity: 0.25;
+            z-index: 0;
+        }
+
+        .auth-left::after {
+            content: '';
+            position: absolute;
+            bottom: -60px;
+            left: -80px;
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+            opacity: 0.2;
+            z-index: 0;
+        }
+
+        .decorative-shape {
+            position: absolute;
+            top: 40%;
+            left: -20px;
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            background: rgba(5, 130, 142, 0.15);
+            transform: rotate(45deg);
+            z-index: 0;
+        }
+
+        .brand-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #ffffff;
+            text-decoration: none;
+            z-index: 1;
+            letter-spacing: 0.5px;
+        }
+
+        .brand-logo:hover {
+            color: #ffffff;
+        }
+
+        .brand-logo i {
+            color: var(--primary);
+            font-size: 1.8rem;
+        }
+
+        .auth-left-content {
+            margin-top: auto;
+            margin-bottom: auto;
+            z-index: 1;
+            text-align: left;
+        }
+
+        .auth-left-content h1 {
+            font-weight: 800;
+            font-size: 3.2rem;
+            margin-bottom: 1.25rem;
+            line-height: 1.1;
+            letter-spacing: -1px;
+        }
+
+        .auth-left-content p {
+            font-size: 1.1rem;
+            opacity: 0.85;
+            max-width: 90%;
+            line-height: 1.6;
+        }
+
+        .auth-footer {
+            z-index: 1;
+            opacity: 0.6;
+            font-size: 0.85rem;
+        }
+
+        /* ── Right Form Panel ── */
+        .auth-right {
+            flex: 6;
+            padding: 3.5rem 4.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: #ffffff;
+        }
+
+        /* Responsive Layout */
+        @@media (max-width: 991px) {
+            .auth-container {
+                flex-direction: column;
+                margin: 1.5rem;
+                height: auto;
+                min-height: auto;
+            }
+            .auth-left {
+                padding: 3rem 2.5rem;
+                min-height: 350px;
+            }
+            .auth-right {
+                padding: 3rem 2.5rem;
+            }
+        }
+        @@media (max-width: 575px) {
+            .auth-right {
+                padding: 2.5rem 1.5rem;
+            }
+        }
+
+        /* ── Typography & Forms ── */
+        .auth-title {
+            color: var(--text-heading);
+            font-weight: 800;
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .auth-subtitle {
+            color: var(--text-muted);
+            font-size: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-heading);
+            margin-bottom: 0.4rem;
+        }
+
+        .form-control {
+            background: var(--input-bg);
+            border: 1px solid rgba(155, 168, 184, 0.4);
+            border-radius: var(--radius-input);
+            padding: 0.7rem 1rem;
+            font-size: 0.95rem;
+            color: var(--text-heading);
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+        }
+
+        .form-control::placeholder {
+            color: var(--text-muted);
+            opacity: 0.8;
+        }
+
+        .form-control:focus {
+            background: #ffffff;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+            outline: none;
+        }
+
+        /* Input Groups */
+        .input-group {
+            position: relative;
+            display: flex;
+            align-items: stretch;
+            width: 100%;
+        }
+
+        .input-group .form-control {
+            border-left: none;
+            padding-left: 0.75rem;
+        }
+
+        .input-group-text {
+            background: var(--input-bg);
+            border: 1px solid rgba(155, 168, 184, 0.4);
+            border-right: none;
+            color: var(--text-muted);
+            border-radius: var(--radius-input) 0 0 var(--radius-input);
+            transition: all 0.2s ease;
+            padding: 0.7rem 0.5rem 0.7rem 1rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group .form-control:focus {
+            border-color: var(--primary);
+        }
+
+        .input-group:focus-within .input-group-text {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .input-group-text.password-toggle {
+            border-left: none;
+            border-right: 1px solid rgba(155, 168, 184, 0.4);
+            border-radius: 0 var(--radius-input) var(--radius-input) 0;
+            cursor: pointer;
+            padding-left: 0.5rem;
+            padding-right: 1rem;
+        }
+        
+        .input-group:focus-within .password-toggle {
+            border-color: var(--primary);
+        }
+
+        /* ── Buttons ── */
+        .btn-primary {
+            background: var(--primary);
+            border: none;
+            border-radius: var(--radius-btn);
+            padding: 0.8rem 1.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 10px rgba(5, 130, 142, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(5, 130, 142, 0.4);
+        }
+
+        .btn-outline-secondary {
+            border: 1px solid var(--border-color);
+            color: var(--text-heading);
+            background: transparent;
+            border-radius: var(--radius-btn);
+            padding: 0.8rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-outline-secondary:hover {
+            background: var(--bg-page);
+            color: var(--text-heading);
+        }
+
+        /* Links */
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        a:hover {
+            color: var(--primary-hover);
+        }
+
+        /* Checkbox */
+        .form-check-input {
+            width: 1.1em;
+            height: 1.1em;
+            margin-top: 0.15em;
+            cursor: pointer;
+            border-color: var(--border-color);
+        }
+        
+        .form-check-input:checked {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .form-check-label {
+            cursor: pointer;
+            color: var(--text-heading);
+            font-size: 0.9rem;
+        }
+
+        .field-validation-error, .text-danger {
+            color: #d32f2f;
+            font-size: 0.8rem;
+            margin-top: 0.3rem;
+            display: block;
+            font-weight: 500;
+        }
+    </style>
+    @RenderSection("Styles", required: false)
+</head>
+<body>
+
+    <div class="auth-container">
+        <!-- LEFT PANEL (Branding) -->
+        <div class="auth-left">
+            <div class="decorative-shape"></div>
+            
+            <a href="/" class="brand-logo mt-3" style="position: relative; z-index: 2;">
+                <!-- Using a subtle visual contrast via filter instead of a solid white box -->
+                <img src="~/images/logo.png" alt="FinSight Logo" style="height: 75px; width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0px 8px 16px rgba(0,0,0,0.3));" />
+            </a>
+            
+            <div class="auth-left-content">
+                <h1 class="text-start">WELCOME</h1>
+                <p class="text-start m-0">Experience a modern, fully-integrated ERP platform designed to streamline your business operations and elevate your workflow.</p>
+            </div>
+            
+            <div class="auth-footer">
+                &copy; @DateTime.Now.Year FinSight Software. All rights reserved.
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL (Form) -->
+        <div class="auth-right">
+            @RenderBody()
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Password toggle logic can be globally applied if elements implement it
+        function togglePassword(inputId, iconSpan) {
+            var input = document.getElementById(inputId);
+            var icon = iconSpan.querySelector('i');
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.remove("bi-eye-slash");
+                icon.classList.add("bi-eye");
+            } else {
+                input.type = "password";
+                icon.classList.remove("bi-eye");
+                icon.classList.add("bi-eye-slash");
+            }
+        }
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

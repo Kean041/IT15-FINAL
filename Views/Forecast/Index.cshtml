@@ -1,0 +1,586 @@
+@model IEnumerable<FinSight.Models.Forecast>
+
+@{
+    ViewData["Title"] = "Financial Forecasting";
+    var budgetAmounts = ViewBag.BudgetAmounts as Dictionary<int, decimal> ?? new Dictionary<int, decimal>();
+}
+
+<style>
+/* ── Color tokens ──────────────────────────── */
+:root {
+    --tq: #05828e;
+    --tq-dark: #047078;
+    --tq-light: rgba(5, 130, 142, 0.08);
+    --tq-glow: rgba(5, 130, 142, 0.18);
+    --navy: #162229;
+    --danger: #E26D5C;
+    --danger-dark: #c95c4d;
+}
+
+/* ── Utilities ─────────────────────────────── */
+.bg-offwhite    { background-color: #e7eaef; }
+.bg-turquoise   { background-color: var(--tq) !important; color: #fff; }
+.text-turquoise { color: var(--tq) !important; }
+.text-navy      { color: var(--navy) !important; }
+
+/* ── Cards ─────────────────────────────────── */
+.card-dashboard {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(0,0,0,0.06);
+    padding: 1.25rem 1.5rem;
+    transition: box-shadow .2s ease;
+}
+.card-dashboard:hover {
+    box-shadow: 0 8px 24px var(--tq-glow), 0 2px 8px rgba(0,0,0,.04);
+}
+
+.analytics-card {
+    background: #fff;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,.03);
+    padding: 20px;
+    height: 100%;
+    border-left: 5px solid var(--tq);
+}
+.analytics-card-navy { border-left-color: var(--navy); }
+
+/* ── Buttons ───────────────────────────────── */
+.btn-turquoise {
+    background-color: var(--tq); color: #fff; border: none;
+    border-radius: 10px; font-size: 14px; font-weight: 500;
+    transition: background .18s, transform .15s, box-shadow .18s;
+}
+.btn-turquoise:hover {
+    background-color: var(--tq-dark); color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--tq-glow);
+}
+.btn-turquoise:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.btn-outline-turquoise {
+    color: var(--tq); border: 1.5px solid var(--tq);
+    border-radius: 10px; background: transparent;
+    font-size: 14px; font-weight: 500;
+    transition: background .18s, color .18s, box-shadow .18s;
+}
+.btn-outline-turquoise:hover {
+    background-color: var(--tq-light); color: var(--tq);
+    box-shadow: 0 0 0 3px var(--tq-glow);
+}
+
+.btn-soft-danger {
+    background-color: var(--danger); color: #fff; border: none;
+    border-radius: 10px; font-size: 14px; font-weight: 500;
+    transition: background .18s, transform .15s;
+}
+.btn-soft-danger:hover {
+    background-color: var(--danger-dark); color: #fff;
+    transform: translateY(-1px);
+}
+
+/* ── Table ─────────────────────────────────── */
+.table thead th {
+    border-bottom: 3px solid var(--tq) !important;
+    color: #f8f9fa !important; font-weight: 600;
+    text-transform: uppercase; font-size: 12px;
+    letter-spacing: .08em;
+    background-color: var(--navy) !important;
+    padding: 16px;
+}
+.table tbody td {
+    vertical-align: middle; color: #2d3748;
+    padding: 13px 16px;
+    border-bottom: 1px solid rgba(0,0,0,.05);
+}
+.table tbody tr { transition: background .15s; }
+.table tbody tr:hover { background: rgba(2,206,203,.04); }
+
+/* ── Pagination ────────────────────────────── */
+.page-item.active .page-link {
+    background-color: var(--tq); border-color: var(--tq); color: #fff;
+}
+.page-link { color: var(--tq); }
+
+/* ── Forecast Type Badges ──────────────────── */
+.badge-best    { background-color: #d1fae5; color: #065f46; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+.badge-base    { background-color: #dbeafe; color: #1e40af; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+.badge-worst   { background-color: #fee2e2; color: #991b1b; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+
+/* ── Variance Badges ───────────────────────── */
+.variance-positive { color: #065f46; font-weight: 600; }
+.variance-negative { color: #991b1b; font-weight: 600; }
+.variance-zero     { color: #6B7280; font-weight: 500; }
+
+/* ── Chart Card ────────────────────────────── */
+.chart-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(0,0,0,.06);
+    box-shadow: 0 4px 15px rgba(0,0,0,.03);
+    padding: 20px;
+}
+
+/* ── Chart Toggle Buttons ──────────────────── */
+.chart-toggle-btn {
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1.5px solid rgba(0,0,0,.1);
+    border-radius: 8px;
+    background: #fff;
+    color: #6B7280;
+    cursor: pointer;
+    transition: all .2s;
+}
+.chart-toggle-btn.active {
+    background: var(--tq);
+    color: #fff;
+    border-color: var(--tq);
+    box-shadow: 0 2px 8px var(--tq-glow);
+}
+.chart-toggle-btn:hover:not(.active) {
+    border-color: var(--tq);
+    color: var(--tq);
+}
+</style>
+
+<div class="container-fluid px-0">
+
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-navy mb-0">Financial Forecasting</h2>
+            <p class="text-muted mb-0">Predict and visualize financial trends across departments.</p>
+        </div>
+        <div>
+            <button class="btn btn-turquoise shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#createModal">
+                <i class="bi bi-plus-lg me-2"></i>New Forecast
+            </button>
+        </div>
+    </div>
+
+    <!-- Analytics Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="analytics-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: .75rem; letter-spacing: .05em;">Total Forecasts</h6>
+                        <h3 class="fw-bold text-navy mb-0">@ViewBag.TotalForecasts</h3>
+                    </div>
+                    <div class="bg-offwhite rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
+                        <i class="bi bi-clipboard-data text-navy fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="analytics-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: .75rem; letter-spacing: .05em;">Avg Predicted Amount</h6>
+                        <h3 class="fw-bold text-turquoise mb-0">@(((decimal)ViewBag.AvgPredicted).ToString("C0"))</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background:var(--tq-light);width:48px;height:48px;">
+                        <i class="bi bi-graph-up text-turquoise fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="analytics-card analytics-card-navy">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: .75rem; letter-spacing: .05em;">Departments Covered</h6>
+                        <h3 class="fw-bold text-navy mb-0">@ViewBag.DeptsCovered</h3>
+                    </div>
+                    <div class="bg-offwhite rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
+                        <i class="bi bi-diagram-3 text-navy fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row g-4 mb-4">
+        <!-- Bar Chart: Forecast vs Actual by Department -->
+        <div class="col-lg-6">
+            <div class="chart-card h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-navy mb-0 ps-1"><i class="bi bi-bar-chart-fill me-2 text-turquoise"></i>Forecast vs Actual</h5>
+                    <span class="text-muted small fw-medium">By Department</span>
+                </div>
+                <canvas id="comparisonChart" height="220"></canvas>
+            </div>
+        </div>
+        <!-- Line Chart: Monthly Trend -->
+        <div class="col-lg-6">
+            <div class="chart-card h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-navy mb-0 ps-1"><i class="bi bi-graph-up-arrow me-2 text-turquoise"></i>Monthly Trends</h5>
+                    <span class="text-muted small fw-medium">Last 6 Months</span>
+                </div>
+                <canvas id="trendChart" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="card-dashboard mb-4 mt-2">
+
+        <!-- Search + Filter Row -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-navy mb-0 ps-2"><i class="bi bi-table me-2 text-turquoise"></i>Forecast Records</h5>
+
+            <form asp-action="Index" method="get" class="d-flex align-items-center">
+                <select name="periodFilter" class="form-select border-0 bg-offwhite shadow-sm me-2 rounded-3 text-secondary fw-medium" style="width:auto;cursor:pointer;">
+                    <option value="" selected="@(string.IsNullOrEmpty(ViewBag.CurrentPeriod) ? "selected" : null)">All Time</option>
+                    <option value="Day" selected="@(ViewBag.CurrentPeriod == "Day" ? "selected" : null)">Today</option>
+                    <option value="Week" selected="@(ViewBag.CurrentPeriod == "Week" ? "selected" : null)">This Week</option>
+                    <option value="Month" selected="@(ViewBag.CurrentPeriod == "Month" ? "selected" : null)">This Month</option>
+                </select>
+
+                <div class="input-group shadow-sm bg-offwhite rounded-3 border-0 overflow-hidden" style="width:280px;">
+                    <span class="input-group-text border-0 bg-transparent text-turquoise"><i class="bi bi-search"></i></span>
+                    <input type="text" name="searchString" value="@ViewBag.CurrentSearch" class="form-control border-0 shadow-none bg-transparent" placeholder="Search..." />
+                </div>
+
+                <button type="submit" class="btn btn-turquoise ms-2 rounded-3 px-3 shadow-sm fw-semibold">Search</button>
+
+                @if (!string.IsNullOrEmpty(ViewBag.CurrentSearch) || !string.IsNullOrEmpty(ViewBag.CurrentPeriod))
+                {
+                    <a asp-action="Index" class="btn btn-light ms-2 rounded-3 text-danger shadow-sm"><i class="bi bi-x-circle"></i></a>
+                }
+            </form>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive rounded-top-3">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Department</th>
+                            <th>Budget Reference</th>
+                            <th>Forecast Type</th>
+                            <th>Predicted ($)</th>
+                            <th>Actual ($)</th>
+                            <th>Variance</th>
+                            <th>Year</th>
+                            <th>Created By</th>
+                            <th>Date</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var item in Model)
+                            {
+                                var actualAmount = budgetAmounts.ContainsKey(item.BudgetID) ? budgetAmounts[item.BudgetID] : 0m;
+                                var variance = item.PredictedAmount - actualAmount;
+                                var varianceClass = variance > 0 ? "variance-positive" : variance < 0 ? "variance-negative" : "variance-zero";
+                                var variancePrefix = variance > 0 ? "+" : "";
+
+                                <tr>
+                                    <td class="ps-4 fw-semibold text-turquoise">@item.Department?.DepartmentName</td>
+                                    <td class="small">@item.Budget?.Category</td>
+                                    <td>
+                                        @{
+                                            var typeBadge = item.ForecastType switch {
+                                                "Best Case" => "badge-best",
+                                                "Worst Case" => "badge-worst",
+                                                _ => "badge-base"
+                                            };
+                                        }
+                                        <span class="badge @typeBadge">@item.ForecastType</span>
+                                    </td>
+                                    <td class="fw-bold">@item.PredictedAmount.ToString("N2")</td>
+                                    <td class="text-secondary">@actualAmount.ToString("N2")</td>
+                                    <td class="@varianceClass small">@variancePrefix@variance.ToString("N2")</td>
+                                    <td>@item.Year</td>
+                                    <td class="text-secondary small">@item.Creator?.FullName</td>
+                                    <td class="text-secondary small">@item.CreatedAt.ToString("MMM dd, yyyy")</td>
+                                    <td class="text-end pe-4">
+                                        <div class="d-flex justify-content-end align-items-center gap-1">
+                                            <button class="btn btn-sm btn-outline-turquoise"
+                                                    onclick="openEditModal(@item.ForecastID, @item.BudgetID, '@item.ForecastType.Replace("'", "\\'")', @item.PredictedAmount.ToString(System.Globalization.CultureInfo.InvariantCulture), @item.Year)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form asp-action="Delete" asp-route-id="@item.ForecastID" method="post" class="m-0 p-0" onsubmit="return confirm('Delete this forecast?');">
+                                                <button type="submit" class="btn btn-sm btn-soft-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center py-5 text-muted">
+                                    <i class="bi bi-folder-x fs-1 d-block mb-3 text-turquoise"></i>
+                                    No forecast records found matching your filters.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            @if (ViewBag.TotalPages != null && ViewBag.TotalPages > 1)
+            {
+                <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-white" style="border-radius: 0 0 16px 16px;">
+                    <span class="text-muted small fw-medium">Showing Page @ViewBag.CurrentPage of @ViewBag.TotalPages</span>
+                    <ul class="pagination pagination-sm mb-0 shadow-sm">
+                        @for (int i = 1; i <= ViewBag.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == ViewBag.CurrentPage ? "active" : "")">
+                                <a class="page-link" asp-action="Index" asp-route-page="@i" asp-route-searchString="@ViewBag.CurrentSearch" asp-route-periodFilter="@ViewBag.CurrentPeriod">@i</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- CREATE MODAL -->
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-turquoise border-0">
+                <h5 class="modal-title fw-bold" id="createModalLabel"><i class="bi bi-graph-up me-2"></i>New Financial Forecast</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Create" method="post">
+                <div class="modal-body bg-offwhite p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Budget (Department — Category)</label>
+                        <select name="BudgetID" id="createBudgetID" asp-items="ViewBag.Budgets" class="form-select shadow-sm border-0" required>
+                            <option value="">-- Select Budget --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Forecast Type</label>
+                        <select name="ForecastType" asp-items="ViewBag.ForecastTypes" class="form-select shadow-sm border-0" required></select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Predicted Amount ($)</label>
+                            <input type="number" name="PredictedAmount" step="0.01" min="0" class="form-control shadow-sm border-0" placeholder="0.00" required />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Year</label>
+                            <input type="number" name="Year" value="@DateTime.Now.Year" class="form-control shadow-sm border-0" required />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-offwhite pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-light shadow-sm fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-turquoise shadow-sm px-4">Save Forecast</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-turquoise border-0">
+                <h5 class="modal-title fw-bold" id="editModalLabel"><i class="bi bi-pencil-square me-2"></i>Edit Forecast</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Edit" method="post" id="editForm">
+                <div class="modal-body bg-offwhite p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Budget (Department — Category)</label>
+                        <select name="BudgetID" id="editBudgetID" asp-items="ViewBag.Budgets" class="form-select shadow-sm border-0" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Forecast Type</label>
+                        <select name="ForecastType" id="editType" asp-items="ViewBag.ForecastTypes" class="form-select shadow-sm border-0" required></select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Predicted Amount ($)</label>
+                            <input type="number" name="PredictedAmount" id="editAmount" step="0.01" min="0" class="form-control shadow-sm border-0" required />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Year</label>
+                            <input type="number" name="Year" id="editYear" class="form-control shadow-sm border-0" required />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-offwhite pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-light shadow-sm fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-turquoise shadow-sm px-4">Update Forecast</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        // ── Bar Chart: Forecast vs Actual by Department ──
+        const barCtx = document.getElementById('comparisonChart').getContext('2d');
+        const barLabels = @Html.Raw(ViewBag.BarChartLabels);
+        const forecastData = @Html.Raw(ViewBag.BarChartForecast);
+        const actualData = @Html.Raw(ViewBag.BarChartActual);
+
+        new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: barLabels,
+                datasets: [
+                    {
+                        label: 'Forecasted',
+                        data: forecastData,
+                        backgroundColor: 'rgba(5, 130, 142, 0.7)',
+                        borderColor: '#05828e',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barPercentage: 0.45
+                    },
+                    {
+                        label: 'Actual (Budget)',
+                        data: actualData,
+                        backgroundColor: 'rgba(22, 34, 41, 0.55)',
+                        borderColor: '#162229',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barPercentage: 0.45
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, padding: 20, font: { size: 12, family: "'Inter','Segoe UI',sans-serif" } }
+                    },
+                    tooltip: {
+                        backgroundColor: '#162229',
+                        titleFont: { size: 13 },
+                        bodyFont: { size: 12 },
+                        padding: 12,
+                        cornerRadius: 10,
+                        callbacks: {
+                            label: function(ctx) { return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString(); }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 11 } } },
+                    y: {
+                        grid: { color: 'rgba(0,0,0,0.04)' },
+                        ticks: {
+                            color: '#6B7280', font: { size: 11 },
+                            callback: function(v) { return '$' + v.toLocaleString(); }
+                        }
+                    }
+                }
+            }
+        });
+
+        // ── Line Chart: Monthly Forecast vs Actual Trend ──
+        const lineCtx = document.getElementById('trendChart').getContext('2d');
+        const lineLabels = @Html.Raw(ViewBag.LineChartLabels);
+        const lineForecast = @Html.Raw(ViewBag.LineChartForecast);
+        const lineActual = @Html.Raw(ViewBag.LineChartActual);
+
+        new Chart(lineCtx, {
+            type: 'line',
+            data: {
+                labels: lineLabels,
+                datasets: [
+                    {
+                        label: 'Forecasted',
+                        data: lineForecast,
+                        borderColor: '#05828e',
+                        backgroundColor: 'rgba(5, 130, 142, 0.08)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#05828e',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    },
+                    {
+                        label: 'Actual (Budget)',
+                        data: lineActual,
+                        borderColor: '#E26D5C',
+                        backgroundColor: 'rgba(226, 109, 92, 0.08)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#E26D5C',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        borderDash: [6, 3]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, padding: 20, font: { size: 12, family: "'Inter','Segoe UI',sans-serif" } }
+                    },
+                    tooltip: {
+                        backgroundColor: '#162229',
+                        titleFont: { size: 13 },
+                        bodyFont: { size: 12 },
+                        padding: 12,
+                        cornerRadius: 10,
+                        callbacks: {
+                            label: function(ctx) { return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString(); }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 11 } } },
+                    y: {
+                        grid: { color: 'rgba(0,0,0,0.04)' },
+                        ticks: {
+                            color: '#6B7280', font: { size: 11 },
+                            callback: function(v) { return '$' + v.toLocaleString(); }
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    // ── Edit Modal Population ──
+    function openEditModal(id, budgetId, forecastType, amount, year) {
+        document.getElementById('editForm').action = '/Forecast/Edit/' + id;
+        document.getElementById('editBudgetID').value = budgetId;
+        document.getElementById('editType').value = forecastType;
+        document.getElementById('editAmount').value = amount;
+        document.getElementById('editYear').value = year;
+
+        var modal = new bootstrap.Modal(document.getElementById('editModal'));
+        modal.show();
+    }
+</script>

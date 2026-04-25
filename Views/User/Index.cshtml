@@ -1,0 +1,631 @@
+@model IEnumerable<FinSight.Models.User>
+
+@{
+    ViewData["Title"] = "User Management";
+}
+
+<style>
+/* ── Color tokens ──────────────────────────── */
+:root {
+    --tq: #05828e;
+    --tq-dark: #047078;
+    --tq-light: rgba(5, 130, 142, 0.08);
+    --tq-glow: rgba(5, 130, 142, 0.18);
+    --navy: #162229;
+    --danger: #E26D5C;
+    --danger-dark: #c95c4d;
+    --success: #10b981;
+    --success-light: rgba(16, 185, 129, 0.08);
+    --warning: #f59e0b;
+    --warning-light: rgba(245, 158, 11, 0.08);
+}
+
+/* ── Backgrounds ───────────────────────────── */
+.bg-offwhite    { background-color: #e7eaef; }
+.bg-turquoise   { background-color: var(--tq) !important; color: #fff; }
+.text-turquoise { color: var(--tq) !important; }
+.text-navy      { color: var(--navy) !important; }
+
+/* ── Card ──────────────────────────────────── */
+.card-dashboard {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 1.25rem 1.5rem;
+    transition: box-shadow 0.2s ease;
+}
+.card-dashboard:hover {
+    box-shadow: 0 8px 24px var(--tq-glow), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Analytics Summary Cards */
+.analytics-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    padding: 20px;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    border-left: 5px solid var(--tq);
+}
+.analytics-card-navy    { border-left-color: var(--navy); }
+.analytics-card-success { border-left-color: var(--success); }
+.analytics-card-warning { border-left-color: var(--warning); }
+
+/* ── Buttons ───────────────────────────────── */
+.btn-turquoise {
+    background-color: var(--tq);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
+}
+.btn-turquoise:hover {
+    background-color: var(--tq-dark);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--tq-glow);
+}
+.btn-turquoise:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.btn-outline-turquoise {
+    color: var(--tq);
+    border: 1.5px solid var(--tq);
+    border-radius: 10px;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.btn-outline-turquoise:hover {
+    background-color: var(--tq-light);
+    color: var(--tq);
+    box-shadow: 0 0 0 3px var(--tq-glow);
+}
+
+.btn-soft-danger {
+    background-color: var(--danger);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.18s, transform 0.15s;
+}
+.btn-soft-danger:hover {
+    background-color: var(--danger-dark);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+/* ── Table ─────────────────────────────────── */
+.table thead th {
+    border-bottom: 2px solid var(--navy) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    background-color: var(--navy) !important;
+    padding: 14px 16px;
+}
+.table tbody td {
+    vertical-align: middle;
+    color: #2d3748;
+    padding: 13px 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+.table tbody tr {
+    transition: background 0.15s;
+}
+.table tbody tr:hover {
+    background: rgba(2, 206, 203, 0.04);
+}
+
+/* ── Pagination ────────────────────────────── */
+.page-item.active .page-link {
+    background-color: var(--tq);
+    border-color: var(--tq);
+    color: white;
+}
+.page-link {
+    color: var(--tq);
+}
+
+/* ── Role Badges ───────────────────────────── */
+.badge-super-admin { background-color: #ede9fe; color: #5b21b6; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+.badge-admin       { background-color: #dbeafe; color: #1e40af; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+.badge-finance     { background-color: #d1fae5; color: #065f46; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+.badge-dept-head   { background-color: #fef3c7; color: #92400e; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+.badge-executive   { background-color: #fce7f3; color: #9d174d; border-radius: 20px; padding: 4px 11px; font-size: 12px; font-weight: 500; }
+
+/* ── User Avatar ───────────────────────────── */
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--tq);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+/* ── Toast notification ────────────────────── */
+.toast-notification {
+    position: fixed;
+    top: 80px;
+    right: 28px;
+    z-index: 9999;
+    min-width: 320px;
+    animation: slideInRight 0.4s ease;
+}
+@@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+</style>
+
+@* ─── Toast Messages ─── *@
+@if (TempData["Success"] != null)
+{
+    <div class="toast-notification alert alert-success alert-dismissible fade show shadow-lg border-0" role="alert" id="successToast">
+        <i class="bi bi-check-circle-fill me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="toast-notification alert alert-danger alert-dismissible fade show shadow-lg border-0" role="alert" id="errorToast">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="container-fluid px-0">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-navy mb-0">User Management</h2>
+            <p class="text-muted mb-0">Manage team members and their access roles.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-action="Archived" class="btn btn-outline-turquoise shadow-sm px-3 py-2">
+                <i class="bi bi-archive me-2"></i>Archived <span class="badge bg-secondary ms-1">@ViewBag.ArchivedCount</span>
+            </a>
+            <button class="btn btn-turquoise shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#createUserModal" id="btnAddUser">
+                <i class="bi bi-person-plus me-2"></i>Add User
+            </button>
+        </div>
+    </div>
+
+    <!-- Analytics Summary Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Total Users -->
+        <div class="col-md-4">
+            <div class="analytics-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Total Users</h6>
+                        <h3 class="fw-bold text-navy mb-0">@ViewBag.TotalUsers</h3>
+                    </div>
+                    <div class="bg-offwhite rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <i class="bi bi-people text-navy fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Active Users -->
+        <div class="col-md-4">
+            <div class="analytics-card analytics-card-success">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Active Users</h6>
+                        <h3 class="fw-bold text-turquoise mb-0">@ViewBag.ActiveCount</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background: var(--success-light); width: 48px; height: 48px;">
+                        <i class="bi bi-person-check" style="color: var(--success); font-size: 1.25rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Archived Users -->
+        <div class="col-md-4">
+            <div class="analytics-card analytics-card-warning">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Archived Users</h6>
+                        <h3 class="fw-bold text-navy mb-0">@ViewBag.ArchivedCount</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background: var(--warning-light); width: 48px; height: 48px;">
+                        <i class="bi bi-person-dash" style="color: var(--warning); font-size: 1.25rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="card card-dashboard mb-4 mt-2">
+
+        <!-- Search Header -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-navy mb-0 ps-2"><i class="bi bi-people-fill me-2 text-turquoise"></i>Active Users</h5>
+
+            <form asp-action="Index" method="get" class="d-flex align-items-center">
+                <div class="input-group shadow-sm bg-offwhite rounded-3 border-0 overflow-hidden" style="width: 280px;">
+                    <span class="input-group-text border-0 bg-transparent text-turquoise"><i class="bi bi-search"></i></span>
+                    <input type="text" name="searchString" value="@ViewBag.CurrentSearch" class="form-control border-0 shadow-none bg-transparent" placeholder="Search users..." />
+                </div>
+                <button type="submit" class="btn btn-turquoise ms-2 rounded-3 px-3 shadow-sm fw-semibold">Search</button>
+                @if (!string.IsNullOrEmpty((string?)ViewBag.CurrentSearch))
+                {
+                    <a asp-action="Index" class="btn btn-light ms-2 rounded-3 text-danger shadow-sm"><i class="bi bi-x-circle"></i></a>
+                }
+            </form>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive rounded-top-3">
+                <table class="table table-hover mb-0" id="usersTable">
+                    <thead class="bg-navy text-white">
+                        <tr>
+                            <th class="ps-4">User</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Department</th>
+                            <th>Created</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var user in Model)
+                            {
+                                var initials = string.Join("", user.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => w[0])).ToUpper();
+                                var roleBadge = user.RoleID switch
+                                {
+                                    0 => "badge-super-admin",
+                                    1 => "badge-admin",
+                                    2 => "badge-finance",
+                                    3 => "badge-dept-head",
+                                    4 => "badge-executive",
+                                    _ => "badge-admin"
+                                };
+                                var roleName = FinSight.Helpers.Roles.GetRoleName(user.RoleID);
+                                var isSelf = user.UserID == (int?)ViewBag.CurrentUserID;
+
+                                <tr>
+                                    <td class="ps-4">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="user-avatar">@initials</div>
+                                            <span class="fw-semibold">@user.FullName</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-secondary">@user.Email</td>
+                                    <td><span class="badge @roleBadge">@roleName</span></td>
+                                    <td class="text-secondary">@(user.Department?.DepartmentName ?? "—")</td>
+                                    <td class="text-secondary small">@(user.CreatedAt?.ToString("MMM dd, yyyy") ?? "—")</td>
+                                    <td>
+                                        <div class="d-flex justify-content-end align-items-center gap-1 pe-3">
+                                            <button class="btn btn-sm btn-outline-turquoise"
+                                                    onclick="openEditUserModal(@user.UserID, '@user.FullName.Replace("'", "\\'")', @(user.RoleID ?? 1), @(user.DepartmentID?.ToString() ?? "''"))"
+                                                    title="Edit User">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            @if (!isSelf)
+                                            {
+                                                <button type="button"
+                                                        class="btn btn-sm btn-soft-danger"
+                                                        title="Archive User"
+                                                        data-archive-id="@user.UserID"
+                                                        data-archive-name="@user.FullName"
+                                                        onclick="openArchiveModal(this)">
+                                                    <i class="bi bi-archive"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-light text-muted border" style="font-size:11px;line-height:1.6;">You</span>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <i class="bi bi-person-x fs-1 d-block mb-3 text-turquoise"></i>
+                                    No active users found.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            @if (ViewBag.TotalPages != null && ViewBag.TotalPages > 1)
+            {
+                <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-white" style="border-radius: 0 0 16px 16px;">
+                    <span class="text-muted small fw-medium">Showing Page @ViewBag.CurrentPage of @ViewBag.TotalPages</span>
+                    <ul class="pagination pagination-sm mb-0 shadow-sm">
+                        @for (int i = 1; i <= ViewBag.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == ViewBag.CurrentPage ? "active" : "")">
+                                <a class="page-link" asp-action="Index" asp-route-page="@i" asp-route-searchString="@ViewBag.CurrentSearch">@i</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ ARCHIVE CONFIRMATION MODAL ═══════════ -->
+<div class="modal fade" id="archiveUserModal" tabindex="-1" aria-labelledby="archiveUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header border-0" style="background:#080b11;">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle"
+                         style="width:38px;height:38px;background:rgba(226,109,92,0.15);">
+                        <i class="bi bi-archive-fill" style="color:#E26D5C;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-white mb-0" id="archiveUserModalLabel">Archive User</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="background:#fff;">
+                <p class="text-secondary mb-1">Are you sure you want to archive</p>
+                <p class="fw-bold mb-3" id="archiveUserName" style="color:#162229;"></p>
+                <div class="alert d-flex align-items-center gap-2 border-0 mb-0 py-2 px-3" style="background:#fef3c7;border-radius:10px;">
+                    <i class="bi bi-info-circle-fill" style="color:#f59e0b;flex-shrink:0;"></i>
+                    <span class="small" style="color:#92400e;">This user will lose all access. You can restore them later from the Archived list.</span>
+                </div>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-0" style="background:#fff;">
+                <button type="button" class="btn btn-light fw-semibold shadow-sm" data-bs-dismiss="modal" style="border-radius:10px;">Cancel</button>
+                <button type="button" class="btn btn-soft-danger fw-semibold shadow-sm px-4" id="confirmArchiveBtn" style="border-radius:10px;">
+                    <i class="bi bi-archive me-2"></i>Archive
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden Archive Form (submitted by modal Confirm button) -->
+<form id="archiveForm" asp-action="Archive" method="post" style="display:none;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" id="archiveUserId" />
+</form>
+
+<!-- ═══════════ CREATE USER MODAL ═══════════ -->
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-turquoise border-0">
+                <h5 class="modal-title fw-bold" id="createUserModalLabel"><i class="bi bi-person-plus me-2"></i>Add New User</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Create" method="post">
+                <div class="modal-body bg-offwhite p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Full Name</label>
+                        <input type="text" name="FullName" class="form-control shadow-sm border-0" placeholder="e.g. Juan Dela Cruz" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Email Address</label>
+                        <input type="email" name="Email" class="form-control shadow-sm border-0" placeholder="e.g. juan@company.com" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Password</label>
+                        <div class="input-group shadow-sm border-0 rounded-3 overflow-hidden">
+                            <input type="password" name="Password" id="createPassword" class="form-control border-0" placeholder="Enter password" required minlength="6" />
+                            <button type="button" class="btn btn-light border-0" onclick="togglePassword('createPassword', this)">
+                                <i class="bi bi-eye-slash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Role</label>
+                            <select name="RoleID" class="form-select shadow-sm border-0" required>
+                                <option value="" disabled selected hidden>Select Role...</option>
+                                @if (ViewBag.Roles != null)
+                                {
+                                    foreach (var role in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.Roles)
+                                    {
+                                        <option value="@role.Value">@role.Text</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Department</label>
+                            <div class="d-flex gap-2">
+                                <select name="DepartmentID" id="createDepartmentID" class="form-select shadow-sm border-0 w-100" required>
+                                    <option value="" disabled selected hidden>Select Department...</option>
+                                    @if (ViewBag.Departments != null)
+                                    {
+                                        foreach (var dept in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.Departments)
+                                        {
+                                            <option value="@dept.Value">@dept.Text</option>
+                                        }
+                                    }
+                                </select>
+                                <button type="button" class="btn btn-outline-turquoise btn-sm px-2 shadow-sm" onclick="addNewDepartment('createDepartmentID', this)" title="Add Department" style="border-radius: 6px;"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-offwhite pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-light shadow-sm fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-turquoise shadow-sm px-4">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ EDIT USER MODAL ═══════════ -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-turquoise border-0">
+                <h5 class="modal-title fw-bold" id="editUserModalLabel"><i class="bi bi-pencil-square me-2"></i>Edit User</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Edit" method="post" id="editUserForm">
+                <div class="modal-body bg-offwhite p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Full Name</label>
+                        <input type="text" name="FullName" id="editFullName" class="form-control shadow-sm border-0" required />
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Role</label>
+                            <select name="RoleID" id="editRoleID" class="form-select shadow-sm border-0" required>
+                                <option value="" disabled selected hidden>Select Role...</option>
+                                @if (ViewBag.Roles != null)
+                                {
+                                    foreach (var role in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.Roles)
+                                    {
+                                        <option value="@role.Value">@role.Text</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Department</label>
+                            <div class="d-flex gap-2">
+                                <select name="DepartmentID" id="editDepartmentID" class="form-select shadow-sm border-0 w-100" required>
+                                    <option value="" disabled selected hidden>Select Department...</option>
+                                    @if (ViewBag.Departments != null)
+                                    {
+                                        foreach (var dept in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.Departments)
+                                        {
+                                            <option value="@dept.Value">@dept.Text</option>
+                                        }
+                                    }
+                                </select>
+                                <button type="button" class="btn btn-outline-turquoise btn-sm px-2 shadow-sm" onclick="addNewDepartment('editDepartmentID', this)" title="Add Department" style="border-radius: 6px;"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-offwhite pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-light shadow-sm fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-turquoise shadow-sm px-4">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // ── Open Edit Modal & populate fields ──
+    function openEditUserModal(id, fullName, roleId, deptId) {
+        document.getElementById('editUserForm').action = '/User/Edit/' + id;
+        document.getElementById('editFullName').value = fullName;
+        document.getElementById('editRoleID').value = roleId;
+
+        var deptSelect = document.getElementById('editDepartmentID');
+        deptSelect.value = (deptId !== '' && deptId !== null) ? deptId : '';
+
+        var modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+        modal.show();
+    }
+
+    // ── Open Archive Confirmation Modal ──
+    function openArchiveModal(btn) {
+        var userId   = btn.getAttribute('data-archive-id');
+        var userName = btn.getAttribute('data-archive-name');
+
+        document.getElementById('archiveUserId').value   = userId;
+        document.getElementById('archiveUserName').textContent = '"' + userName + '"';
+
+        var modal = new bootstrap.Modal(document.getElementById('archiveUserModal'));
+        modal.show();
+    }
+
+    // ── Confirm Archive — submit hidden form ──
+    document.getElementById('confirmArchiveBtn').addEventListener('click', function () {
+        document.getElementById('archiveForm').submit();
+    });
+
+    // ── Toggle password visibility ──
+    function togglePassword(inputId, btn) {
+        var input = document.getElementById(inputId);
+        var icon = btn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        }
+    }
+
+    // ── Add New Department via AJAX ──
+    async function addNewDepartment(selectId, btnElement) {
+        var newName = prompt("Enter the new department name:");
+        if (!newName || newName.trim() === '') return;
+
+        btnElement.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        btnElement.disabled = true;
+
+        try {
+            const response = await fetch('/User/AddDepartmentApi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newName)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                var selects = document.querySelectorAll('select[name="DepartmentID"]');
+                selects.forEach(function(select) {
+                    var option = new Option(data.name, data.id);
+                    select.add(option);
+                    if (select.id === selectId) select.value = data.id;
+                });
+                alert(`Department "${data.name}" added successfully!`);
+            } else {
+                alert("Failed to add department. Make sure you don't use special characters or try again later.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Network error. Could not reach the server.");
+        } finally {
+            btnElement.innerHTML = '<i class="bi bi-plus-lg"></i>';
+            btnElement.disabled = false;
+        }
+    }
+
+    // ── Auto-dismiss toasts after 4s ──
+    setTimeout(function () {
+        document.querySelectorAll('.toast-notification').forEach(function (toast) {
+            bootstrap.Alert.getOrCreateInstance(toast).close();
+        });
+    }, 4000);
+</script>
+}

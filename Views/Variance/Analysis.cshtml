@@ -1,0 +1,376 @@
+@model IEnumerable<FinSight.Models.ViewModels.VarianceAnalysisViewModel>
+
+@{
+    ViewData["Title"] = "Variance Analysis";
+}
+
+<style>
+/* ── Color tokens ──────────────────────────── */
+:root {
+    --accent:      #05828e;
+    --accent-dark: #047078;
+    --accent-light:rgba(5,130,142,0.08);
+    --accent-glow: rgba(5,130,142,0.18);
+    --dark:        #162229;
+    --header:      #080b11;
+    --muted:       #9ba8b8;
+    --bg:          #e7eaef;
+    --danger:      #E26D5C;
+    --danger-dark: #c95c4d;
+}
+
+/* ── Utilities ─────────────────────────────── */
+.bg-soft        { background-color: var(--bg); }
+.bg-accent      { background-color: var(--accent) !important; color: #fff; }
+.text-accent    { color: var(--accent) !important; }
+.text-dark-nav  { color: var(--dark) !important; }
+
+/* ── Cards ─────────────────────────────────── */
+.mod-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(155,168,184,.15);
+    padding: 1.25rem 1.5rem;
+    transition: box-shadow .2s ease;
+}
+.mod-card:hover {
+    box-shadow: 0 8px 24px var(--accent-glow), 0 2px 8px rgba(0,0,0,.04);
+}
+
+.stat-card {
+    background: #fff;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,.03);
+    padding: 20px;
+    height: 100%;
+    border-left: 5px solid var(--accent);
+}
+.stat-card-dark   { border-left-color: var(--dark); }
+.stat-card-danger { border-left-color: var(--danger); }
+.stat-card-green  { border-left-color: #10B981; }
+
+/* ── Buttons ───────────────────────────────── */
+.btn-accent {
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 10px; font-size: 14px; font-weight: 500;
+    transition: background .18s, transform .15s, box-shadow .18s;
+}
+.btn-accent:hover {
+    background: var(--accent-dark); color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--accent-glow);
+}
+
+/* ── Table ─────────────────────────────────── */
+.table thead th {
+    border-bottom: 2px solid var(--dark) !important;
+    color: #fff !important; font-weight: 600;
+    text-transform: uppercase; font-size: 11px;
+    letter-spacing: .07em;
+    background: var(--dark) !important;
+    padding: 14px 16px;
+}
+.table tbody td {
+    vertical-align: middle; color: #2d3748;
+    padding: 13px 16px;
+    border-bottom: 1px solid rgba(155,168,184,.12);
+}
+.table tbody tr { transition: background .15s; }
+.table tbody tr:hover { background: var(--accent-light); }
+
+/* ── Pagination ────────────────────────────── */
+.page-item.active .page-link {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.page-link { color: var(--accent); }
+
+/* ── Status Badges ─────────────────────────── */
+.badge-under  { background: #d1fae5; color: #065f46; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600; }
+.badge-over   { background: #fee2e2; color: #991b1b; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600; }
+.badge-track  { background: #dbeafe; color: #1e40af; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 600; }
+
+.val-positive { color: #059669; font-weight: 700; }
+.val-negative { color: #dc2626; font-weight: 700; }
+
+/* ── Chart Card ────────────────────────────── */
+.chart-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(155,168,184,.12);
+    box-shadow: 0 4px 15px rgba(0,0,0,.03);
+    padding: 20px;
+}
+</style>
+
+<div class="container-fluid px-0">
+
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark-nav mb-0">Variance Analysis</h2>
+            <p class="mb-0" style="color:var(--muted);">Compare budgeted amounts against actual expenses to identify deviations.</p>
+        </div>
+    </div>
+
+    <!-- Analytics Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card stat-card-dark">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="fw-bold text-uppercase" style="font-size:.75rem;letter-spacing:.05em;color:var(--muted);">Total Records</h6>
+                        <h3 class="fw-bold text-dark-nav mb-0">@ViewBag.TotalRecords</h3>
+                    </div>
+                    <div class="bg-soft rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
+                        <i class="bi bi-clipboard2-data-fill text-dark-nav fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card stat-card-green">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="fw-bold text-uppercase" style="font-size:.75rem;letter-spacing:.05em;color:var(--muted);">Under Budget</h6>
+                        <h3 class="fw-bold mb-0 val-positive">@ViewBag.UnderBudgetCount</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background:rgba(16,185,129,.08);width:48px;height:48px;">
+                        <i class="bi bi-check-circle-fill fs-5" style="color:#10B981;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card stat-card-danger">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="fw-bold text-uppercase" style="font-size:.75rem;letter-spacing:.05em;color:var(--muted);">Over Budget</h6>
+                        <h3 class="fw-bold mb-0 val-negative">@ViewBag.OverBudgetCount</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background:rgba(226,109,92,.08);width:48px;height:48px;">
+                        <i class="bi bi-exclamation-triangle-fill fs-5" style="color:var(--danger);"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="fw-bold text-uppercase" style="font-size:.75rem;letter-spacing:.05em;color:var(--muted);">Net Variance</h6>
+                        <h3 class="fw-bold mb-0 @(((decimal)ViewBag.TotalVariance) >= 0 ? "val-positive" : "val-negative")">
+                            @(((decimal)ViewBag.TotalVariance).ToString("C0"))
+                        </h3>
+                    </div>
+                    <div class="bg-soft rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
+                        <i class="bi bi-arrow-left-right text-accent fs-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart: Budget vs Actual -->
+    <div class="chart-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-dark-nav mb-0 ps-1"><i class="bi bi-bar-chart-fill me-2 text-accent"></i>Budget vs Actual Expense by Department</h5>
+        </div>
+        <canvas id="varianceChart" height="100"></canvas>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="mod-card mb-4">
+
+        <!-- Search + Filter -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold text-dark-nav mb-0 ps-2"><i class="bi bi-table me-2 text-accent"></i>Variance Records</h5>
+
+            <form asp-action="Analysis" method="get" class="d-flex align-items-center flex-wrap gap-2">
+                <select name="yearFilter" class="form-select border-0 bg-soft shadow-sm rounded-3 fw-medium" style="width:auto;cursor:pointer;color:var(--muted);">
+                    <option value="">All Years</option>
+                    @if (ViewBag.YearList != null)
+                    {
+                        foreach (var y in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.YearList)
+                        {
+                            <option value="@y.Value" selected="@(ViewBag.CurrentYear?.ToString() == y.Value ? "selected" : null)">@y.Text</option>
+                        }
+                    }
+                </select>
+
+                <select name="departmentFilter" class="form-select border-0 bg-soft shadow-sm rounded-3 fw-medium" style="width:auto;cursor:pointer;color:var(--muted);">
+                    <option value="">All Departments</option>
+                    @if (ViewBag.DepartmentList != null)
+                    {
+                        foreach (var d in (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.DepartmentList)
+                        {
+                            <option value="@d.Value" selected="@(ViewBag.CurrentDepartment?.ToString() == d.Value ? "selected" : null)">@d.Text</option>
+                        }
+                    }
+                </select>
+
+                <div class="input-group shadow-sm bg-soft rounded-3 border-0 overflow-hidden" style="width:280px;">
+                    <span class="input-group-text border-0 bg-transparent text-accent"><i class="bi bi-search"></i></span>
+                    <input type="text" name="searchString" value="@ViewBag.CurrentSearch" class="form-control border-0 shadow-none bg-transparent" placeholder="Search..." />
+                </div>
+
+                <button type="submit" class="btn btn-accent rounded-3 px-3 shadow-sm fw-semibold">Search</button>
+
+                @if (!string.IsNullOrEmpty(ViewBag.CurrentSearch) || ViewBag.CurrentYear != null || ViewBag.CurrentDepartment != null)
+                {
+                    <a asp-action="Analysis" class="btn btn-light rounded-3 shadow-sm" style="color:var(--danger);"><i class="bi bi-x-circle"></i></a>
+                }
+            </form>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive rounded-top-3">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Department</th>
+                            <th>Category</th>
+                            <th>Budget ($)</th>
+                            <th>Actual ($)</th>
+                            <th>Variance ($)</th>
+                            <th>Status</th>
+                            <th>Year</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td class="ps-4 fw-semibold text-accent">@item.DepartmentName</td>
+                                    <td>@item.Category</td>
+                                    <td class="fw-bold">@item.BudgetAmount.ToString("N2")</td>
+                                    <td class="fw-bold">@item.TotalExpenses.ToString("N2")</td>
+                                    <td class="@(item.Variance >= 0 ? "val-positive" : "val-negative")">
+                                        @(item.Variance >= 0 ? "+" : "")@item.Variance.ToString("N2")
+                                    </td>
+                                    <td>
+                                        @if (item.Status == "Under Budget")
+                                        {
+                                            <span class="badge badge-under"><i class="bi bi-arrow-down me-1"></i>@item.Status</span>
+                                        }
+                                        else if (item.Status == "On Track")
+                                        {
+                                            <span class="badge badge-track"><i class="bi bi-check-lg me-1"></i>@item.Status</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge badge-over"><i class="bi bi-arrow-up me-1"></i>@item.Status</span>
+                                        }
+                                    </td>
+                                    <td class="small" style="color:var(--muted);">@item.Year</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-5" style="color:var(--muted);">
+                                    <i class="bi bi-folder-x fs-1 d-block mb-3 text-accent"></i>
+                                    No variance records found matching your filters.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            @if (ViewBag.TotalPages != null && ViewBag.TotalPages > 1)
+            {
+                <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-white" style="border-radius:0 0 16px 16px;">
+                    <span class="small fw-medium" style="color:var(--muted);">Page @ViewBag.CurrentPage of @ViewBag.TotalPages</span>
+                    <ul class="pagination pagination-sm mb-0 shadow-sm">
+                        @for (int i = 1; i <= ViewBag.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == ViewBag.CurrentPage ? "active" : "")">
+                                <a class="page-link" asp-action="Analysis" asp-route-page="@i" asp-route-searchString="@ViewBag.CurrentSearch" asp-route-yearFilter="@ViewBag.CurrentYear" asp-route-departmentFilter="@ViewBag.CurrentDepartment">@i</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('varianceChart').getContext('2d');
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: @Html.Raw(ViewBag.ChartLabels),
+                datasets: [
+                    {
+                        label: 'Budget',
+                        data: @Html.Raw(ViewBag.ChartBudgets),
+                        backgroundColor: 'rgba(5,130,142,0.7)',
+                        borderColor: '#05828e',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barPercentage: 0.6
+                    },
+                    {
+                        label: 'Actual Expense',
+                        data: @Html.Raw(ViewBag.ChartActuals),
+                        backgroundColor: 'rgba(22,34,41,0.7)',
+                        borderColor: '#162229',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barPercentage: 0.6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true, padding: 20,
+                            font: { size: 12, family: "'Inter','Segoe UI',sans-serif" }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#080b11',
+                        titleFont: { size: 13 },
+                        bodyFont: { size: 12 },
+                        padding: 12,
+                        cornerRadius: 10,
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': $' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#9ba8b8', font: { size: 11 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(155,168,184,.12)' },
+                        ticks: {
+                            color: '#9ba8b8',
+                            font: { size: 11 },
+                            callback: function(v) { return '$' + v.toLocaleString(); }
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>

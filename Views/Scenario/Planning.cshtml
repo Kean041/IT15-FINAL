@@ -1,0 +1,625 @@
+@model IEnumerable<FinSight.Models.Scenario>
+@using System.Globalization
+
+@{
+    ViewData["Title"] = "Scenario Planning";
+}
+
+<style>
+/* ── Color tokens ──────────────────────────── */
+:root {
+    --accent:      #05828e;
+    --accent-dark: #047078;
+    --accent-light:rgba(5,130,142,0.08);
+    --accent-glow: rgba(5,130,142,0.18);
+    --dark:        #162229;
+    --header:      #080b11;
+    --muted:       #9ba8b8;
+    --bg:          #e7eaef;
+    --danger:      #E26D5C;
+    --danger-dark: #c95c4d;
+    --success:     #10B981;
+}
+
+/* ── Cards ─────────────────────────────────── */
+.mod-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(155,168,184,0.15);
+    padding: 1.25rem 1.5rem;
+    transition: box-shadow .2s ease;
+}
+.mod-card:hover {
+    box-shadow: 0 8px 24px var(--accent-glow), 0 2px 8px rgba(0,0,0,.04);
+}
+
+.stat-card {
+    background: #fff;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,.03);
+    padding: 20px;
+    height: 100%;
+    border-left: 5px solid var(--accent);
+}
+.stat-card-dark  { border-left-color: var(--dark); }
+.stat-card-green { border-left-color: var(--success); }
+
+/* ── Buttons ───────────────────────────────── */
+.btn-accent {
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 10px; font-size: 14px; font-weight: 500;
+    transition: background .18s, transform .15s, box-shadow .18s;
+}
+.btn-accent:hover {
+    background: var(--accent-dark); color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--accent-glow);
+}
+.btn-outline-accent {
+    color: var(--accent); border: 1.5px solid var(--accent);
+    border-radius: 10px; background: transparent;
+    font-size: 14px; font-weight: 500;
+    transition: background .18s, color .18s;
+}
+.btn-outline-accent:hover { background: var(--accent-light); color: var(--accent); }
+.btn-soft-danger {
+    background: var(--danger); color: #fff; border: none;
+    border-radius: 10px; font-size: 13px; font-weight: 500;
+    transition: background .18s;
+}
+.btn-soft-danger:hover { background: var(--danger-dark); color: #fff; }
+
+/* ── Table ─────────────────────────────────── */
+.table thead th {
+    border-bottom: 2px solid var(--dark) !important;
+    color: #fff !important; font-weight: 600;
+    text-transform: uppercase; font-size: 11px;
+    letter-spacing: .07em;
+    background: var(--dark) !important;
+    padding: 14px 16px;
+}
+.table tbody td {
+    vertical-align: middle; color: #2d3748;
+    padding: 13px 16px;
+    border-bottom: 1px solid rgba(155,168,184,.12);
+}
+.table tbody tr { transition: background .15s; }
+.table tbody tr:hover { background: var(--accent-light); }
+
+/* ── Pagination ────────────────────────────── */
+.page-item.active .page-link { background: var(--accent); border-color: var(--accent); color: #fff; }
+.page-link { color: var(--accent); }
+
+/* ── Chart Card ────────────────────────────── */
+.chart-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(155,168,184,.12);
+    box-shadow: 0 4px 15px rgba(0,0,0,.03);
+    padding: 20px;
+}
+
+/* ── Detail rows in modal ─────────────────── */
+.detail-row { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 10px; border: 1px solid rgba(155,168,184,.2); }
+
+/* ── Toast ─────────────────────────────────── */
+.toast-container { position: fixed; top: 20px; right: 24px; z-index: 9999; }
+</style>
+
+<div class="container-fluid px-0">
+
+    @* ── Toast notifications ───────────────── *@
+    @if (TempData["Success"] != null)
+    {
+        <div class="toast-container">
+            <div class="toast show align-items-center text-white bg-success border-0 shadow" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body fw-semibold"><i class="bi bi-check-circle me-2"></i>@TempData["Success"]</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="toast-container">
+            <div class="toast show align-items-center text-white bg-danger border-0 shadow" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body fw-semibold"><i class="bi bi-exclamation-circle me-2"></i>@TempData["Error"]</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ── Page Header ─────────────────────── *@
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0" style="color:var(--dark);">Scenario Planning</h2>
+            <p class="mb-0" style="color:var(--muted);">Simulate what-if financial scenarios across departments.</p>
+        </div>
+        <button class="btn btn-accent shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#createModal">
+            <i class="bi bi-lightning-charge-fill me-2"></i>New Scenario
+        </button>
+    </div>
+
+    @* ── Analytics Cards ─────────────────── *@
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="fw-bold text-uppercase" style="font-size:.75rem;letter-spacing:.05em;color:var(--muted);">Total Scenarios</h6>
+                        <h3 class="fw-bold mb-0" style="color:var(--dark);">@ViewBag.TotalScenarios</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background:var(--accent-light);width:48px;height:48px;">
+                        <i class="bi bi-diagram-3-fill fs-5" style="color:var(--accent);"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card stat-card-dark">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="fw-bold text-uppercase" style="font-size:.75rem;letter-spacing:.05em;color:var(--muted);">Total Adjusted</h6>
+                        <h3 class="fw-bold mb-0" style="color:var(--accent);">@(((decimal)ViewBag.TotalAdjusted).ToString("C0"))</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background:var(--accent-light);width:48px;height:48px;">
+                        <i class="bi bi-currency-dollar fs-5" style="color:var(--accent);"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card stat-card-green">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="fw-bold text-uppercase" style="font-size:.75rem;letter-spacing:.05em;color:var(--muted);">Departments Covered</h6>
+                        <h3 class="fw-bold mb-0" style="color:var(--dark);">@ViewBag.DeptsCovered</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background:rgba(16,185,129,.1);width:48px;height:48px;">
+                        <i class="bi bi-building fs-5" style="color:var(--success);"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Chart: Budget vs Adjusted per Department ─ *@
+    <div class="chart-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0 ps-1" style="color:var(--dark);">
+                <i class="bi bi-bar-chart-fill me-2" style="color:var(--accent);"></i>Budget vs Adjusted Amount by Department
+            </h5>
+            <button type="button" class="btn btn-outline-accent btn-sm px-3" onclick="showJsonData()">
+                <i class="bi bi-cloud-download me-1"></i>View JSON Data
+            </button>
+        </div>
+        <canvas id="scenarioChart" height="100"></canvas>
+    </div>
+
+    @* ── Data Table ──────────────────────────── *@
+    <div class="mod-card mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0 ps-2" style="color:var(--dark);">
+                <i class="bi bi-table me-2" style="color:var(--accent);"></i>Scenario Records
+            </h5>
+
+            <form asp-action="Planning" method="get" class="d-flex align-items-center gap-2">
+                <select name="periodFilter" class="form-select border-0 shadow-sm rounded-3 fw-medium" style="width:auto;cursor:pointer;color:var(--muted);">
+                    <option value="" selected="@(string.IsNullOrEmpty(ViewBag.CurrentPeriod) ? "selected" : null)">All Time</option>
+                    <option value="Day"   selected="@(ViewBag.CurrentPeriod == "Day"   ? "selected" : null)">Today</option>
+                    <option value="Week"  selected="@(ViewBag.CurrentPeriod == "Week"  ? "selected" : null)">This Week</option>
+                    <option value="Month" selected="@(ViewBag.CurrentPeriod == "Month" ? "selected" : null)">This Month</option>
+                </select>
+
+                <div class="input-group shadow-sm rounded-3 border-0 overflow-hidden" style="width:260px;background:#f4f6f9;">
+                    <span class="input-group-text border-0 bg-transparent" style="color:var(--accent);"><i class="bi bi-search"></i></span>
+                    <input type="text" name="searchString" value="@ViewBag.CurrentSearch" class="form-control border-0 shadow-none bg-transparent" placeholder="Search scenarios..." />
+                </div>
+
+                <button type="submit" class="btn btn-accent rounded-3 px-3 shadow-sm fw-semibold">Search</button>
+
+                @if (!string.IsNullOrEmpty(ViewBag.CurrentSearch?.ToString()) || !string.IsNullOrEmpty(ViewBag.CurrentPeriod?.ToString()))
+                {
+                    <a asp-action="Planning" class="btn btn-light rounded-3 shadow-sm" style="color:var(--danger);"><i class="bi bi-x-circle"></i></a>
+                }
+            </form>
+        </div>
+
+        <div class="card-body p-0">
+            <div class="table-responsive rounded-top-3">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Scenario Name</th>
+                            <th>Description</th>
+                            <th>Details</th>
+                            <th>Total Adjusted ($)</th>
+                            <th>Created By</th>
+                            <th>Created At</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var item in Model)
+                            {
+                                decimal totalAdj = item.ScenarioDetails.Sum(sd => sd.AdjustedAmount);
+                                int detailCount  = item.ScenarioDetails.Count;
+                                <tr>
+                                    <td class="ps-4 fw-semibold" style="color:var(--accent);">@item.ScenarioName</td>
+                                    <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                        @(string.IsNullOrEmpty(item.Description) ? "—" : item.Description)
+                                    </td>
+                                    <td>
+                                        <span class="badge rounded-pill" style="background:var(--accent-light);color:var(--accent);font-size:12px;padding:5px 10px;">
+                                            @detailCount line@(detailCount != 1 ? "s" : "")
+                                        </span>
+                                    </td>
+                                    <td class="fw-bold">@totalAdj.ToString("N2")</td>
+                                    <td>@(item.Creator?.FullName ?? "—")</td>
+                                    <td style="color:var(--muted);font-size:13px;">@item.CreatedAt.ToString("MMM dd, yyyy")</td>
+                                    <td class="text-end pe-4">
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-accent"
+                                                    onclick="openEditModal(@item.ScenarioID, '@Html.Raw(item.ScenarioName.Replace("'","\\'"  ))', '@Html.Raw((item.Description ?? "").Replace("'","\\'"))',
+                                                        [@string.Join(",", item.ScenarioDetails.Select(sd => sd.BudgetID))],
+                                                        [@string.Join(",", item.ScenarioDetails.Select(sd => sd.AdjustedAmount.ToString(CultureInfo.InvariantCulture)))])">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form asp-action="Delete" asp-route-id="@item.ScenarioID" method="post" class="d-inline"
+                                                  onsubmit="return confirm('Delete scenario \'@item.ScenarioName\' and all its details?');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-soft-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-5" style="color:var(--muted);">
+                                    <i class="bi bi-folder-x fs-1 d-block mb-3" style="color:var(--accent);"></i>
+                                    No scenarios found. Click <strong>New Scenario</strong> to get started.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @* ── Pagination ── *@
+            @if (ViewBag.TotalPages != null && ViewBag.TotalPages > 1)
+            {
+                <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-white" style="border-radius:0 0 16px 16px;">
+                    <span class="small fw-medium" style="color:var(--muted);">Page @ViewBag.CurrentPage of @ViewBag.TotalPages</span>
+                    <ul class="pagination pagination-sm mb-0 shadow-sm">
+                        @for (int i = 1; i <= ViewBag.TotalPages; i++)
+                        {
+                            <li class="page-item @(i == ViewBag.CurrentPage ? "active" : "")">
+                                <a class="page-link"
+                                   asp-action="Planning"
+                                   asp-route-page="@i"
+                                   asp-route-searchString="@ViewBag.CurrentSearch"
+                                   asp-route-periodFilter="@ViewBag.CurrentPeriod">@i</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@* ═══════════════════════════════════════════════════════════
+   CREATE MODAL
+═══════════════════════════════════════════════════════════ *@
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header border-0" style="background:var(--dark);">
+                <h5 class="modal-title fw-bold text-white" id="createModalLabel">
+                    <i class="bi bi-lightning-charge-fill me-2" style="color:var(--accent);"></i>New Scenario
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="Create" method="post" id="createForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-body p-4" style="background:var(--bg);">
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small" style="color:var(--muted);">Scenario Name <span class="text-danger">*</span></label>
+                            <input type="text" name="ScenarioName" class="form-control shadow-sm border-0"
+                                   placeholder="e.g. Aggressive Growth Q4" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small" style="color:var(--muted);">Description</label>
+                            <input type="text" name="Description" class="form-control shadow-sm border-0"
+                                   placeholder="Optional description" />
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold mb-0" style="color:var(--dark);">
+                            <i class="bi bi-list-ul me-2" style="color:var(--accent);"></i>Budget Details
+                        </h6>
+                        <button type="button" class="btn btn-outline-accent btn-sm px-3" onclick="addDetailRow('createDetailRows')">
+                            <i class="bi bi-plus-circle me-1"></i>Add Row
+                        </button>
+                    </div>
+
+                    <div id="createDetailRows">
+                        <!-- dynamic rows injected by JS -->
+                    </div>
+                    <p class="text-muted small mt-1"><i class="bi bi-info-circle me-1"></i>Add at least one budget line with an adjusted amount.</p>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4" style="background:var(--bg);">
+                    <button type="button" class="btn btn-light shadow-sm fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-accent shadow-sm px-4">
+                        <i class="bi bi-save me-2"></i>Save Scenario
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* ═══════════════════════════════════════════════════════════
+   EDIT MODAL
+═══════════════════════════════════════════════════════════ *@
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header border-0" style="background:var(--dark);">
+                <h5 class="modal-title fw-bold text-white" id="editModalLabel">
+                    <i class="bi bi-pencil-square me-2" style="color:var(--accent);"></i>Edit Scenario
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="Edit" method="post" id="editForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="ScenarioID" id="editScenarioID" />
+                <div class="modal-body p-4" style="background:var(--bg);">
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small" style="color:var(--muted);">Scenario Name <span class="text-danger">*</span></label>
+                            <input type="text" name="ScenarioName" id="editScenarioName"
+                                   class="form-control shadow-sm border-0" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small" style="color:var(--muted);">Description</label>
+                            <input type="text" name="Description" id="editDescription"
+                                   class="form-control shadow-sm border-0" />
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold mb-0" style="color:var(--dark);">
+                            <i class="bi bi-list-ul me-2" style="color:var(--accent);"></i>Budget Details
+                        </h6>
+                        <button type="button" class="btn btn-outline-accent btn-sm px-3" onclick="addDetailRow('editDetailRows')">
+                            <i class="bi bi-plus-circle me-1"></i>Add Row
+                        </button>
+                    </div>
+
+                    <div id="editDetailRows">
+                        <!-- populated by openEditModal() -->
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4" style="background:var(--bg);">
+                    <button type="button" class="btn btn-light shadow-sm fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-accent shadow-sm px-4">
+                        <i class="bi bi-save me-2"></i>Update Scenario
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@* ═══════════════════════════════════════════════════════════
+   JSON DATA MODAL
+═══════════════════════════════════════════════════════════ *@
+<div class="modal fade" id="jsonModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="background:#1e1e1e; border-radius:12px; overflow:hidden;">
+            <div class="modal-header d-flex align-items-center" style="background:#252526; border-bottom:1px solid #333; padding: 12px 20px;">
+                <h6 class="modal-title text-white fw-semibold mb-0" style="letter-spacing:0.5px; font-size: 14px;">
+                    <i class="bi bi-braces text-info me-2"></i>ComparisonData.json
+                </h6>
+                <div class="ms-auto d-flex gap-2 align-items-center">
+                    <button class="btn btn-sm text-light border-0" style="background:#3a3d41; font-size:12px;" onclick="copyJsonToClipboard()" id="copyJsonBtn">
+                        <i class="bi bi-clipboard me-1"></i>Copy
+                    </button>
+                    <button type="button" class="btn-close btn-close-white" style="font-size:10px;" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body p-0">
+                <pre class="m-0 p-4" style="max-height:500px; overflow-y:auto; scrollbar-width: thin; scrollbar-color: #424242 #1e1e1e;"><code id="jsonContent" style="font-family:'Consolas', 'Courier New', monospace; font-size:13.5px; color:#9cdcfe;">Loading...</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Chart.js ──────────────────────────────── *@
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+    // ── Budget options from server ──────────────────────────────
+    const budgetOptions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        (ViewBag.Budgets as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)
+            ?.Select(x => new { value = x.Value, text = x.Text })
+        ?? Enumerable.Empty<object>()
+    ));
+
+    // ── Add a Budget Detail row ─────────────────────────────────
+    function addDetailRow(containerId, budgetId, adjustedAmount) {
+        const container = document.getElementById(containerId);
+        const row = document.createElement('div');
+        row.className = 'detail-row d-flex gap-3 align-items-end';
+
+        let options = '<option value="">-- Select Budget --</option>';
+        budgetOptions.forEach(b => {
+            const sel = (budgetId && String(b.value) === String(budgetId)) ? 'selected' : '';
+            options += `<option value="${b.value}" ${sel}>${b.text}</option>`;
+        });
+
+        row.innerHTML = `
+            <div class="flex-fill">
+                <label class="form-label small fw-semibold" style="color:var(--muted);">Budget</label>
+                <select name="BudgetIDs" class="form-select border-0 shadow-sm" required>${options}</select>
+            </div>
+            <div style="min-width:180px;">
+                <label class="form-label small fw-semibold" style="color:var(--muted);">Adjusted Amount ($)</label>
+                <input type="number" name="AdjustedAmounts" step="0.01" min="0.01"
+                       class="form-control border-0 shadow-sm" placeholder="0.00"
+                       value="${adjustedAmount ?? ''}" required />
+            </div>
+            <div class="pb-1">
+                <button type="button" class="btn btn-soft-danger btn-sm" onclick="this.closest('.detail-row').remove()">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>`;
+        container.appendChild(row);
+    }
+
+    // ── Open Create modal (pre-add one empty row) ───────────────
+    document.getElementById('createModal').addEventListener('show.bs.modal', function () {
+        const c = document.getElementById('createDetailRows');
+        if (c.children.length === 0) addDetailRow('createDetailRows');
+    });
+
+    // ── Open Edit modal ─────────────────────────────────────────
+    function openEditModal(scenarioID, scenarioName, description, budgetIds, adjustedAmounts) {
+        document.getElementById('editScenarioID').value   = scenarioID;
+        document.getElementById('editScenarioName').value = scenarioName;
+        document.getElementById('editDescription').value  = description;
+
+        const container = document.getElementById('editDetailRows');
+        container.innerHTML = '';
+
+        if (budgetIds && budgetIds.length > 0) {
+            budgetIds.forEach((bid, i) => {
+                addDetailRow('editDetailRows', bid, adjustedAmounts[i]);
+            });
+        } else {
+            addDetailRow('editDetailRows');
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('editModal'));
+        modal.show();
+    }
+
+    // ── Auto-dismiss toasts ──────────────────────────────────────
+    document.querySelectorAll('.toast').forEach(el => {
+        setTimeout(() => bootstrap.Toast.getOrCreateInstance(el).hide(), 4000);
+    });
+
+    // ── Chart ────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('scenarioChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: @Html.Raw(ViewBag.ChartLabels ?? "[]"),
+                datasets: [
+                    {
+                        label: 'Original Budget',
+                        data: @Html.Raw(ViewBag.ChartOriginals ?? "[]"),
+                        backgroundColor: 'rgba(22,34,41,0.75)',
+                        borderColor: '#162229',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barPercentage: 0.65
+                    },
+                    {
+                        label: 'Adjusted Amount',
+                        data: @Html.Raw(ViewBag.ChartAdjusteds ?? "[]"),
+                        backgroundColor: 'rgba(5,130,142,0.75)',
+                        borderColor: '#05828e',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barPercentage: 0.65
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, padding: 20,
+                                  font: { size: 12, family: "'Inter','Segoe UI',sans-serif" } }
+                    },
+                    tooltip: {
+                        backgroundColor: '#080b11',
+                        titleFont: { size: 13 },
+                        bodyFont: { size: 12 },
+                        padding: 12,
+                        cornerRadius: 10,
+                        callbacks: {
+                            label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString()
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false },
+                         ticks: { color: '#9ba8b8', font: { size: 11 } } },
+                    y: { grid: { color: 'rgba(155,168,184,0.12)' },
+                         ticks: { color: '#9ba8b8', font: { size: 11 },
+                                  callback: v => '$' + v.toLocaleString() } }
+                }
+            }
+        });
+    });
+
+    // ── JSON Data Handler ─────────────────────────────────────────
+    function showJsonData() {
+        const modal = new bootstrap.Modal(document.getElementById('jsonModal'));
+        modal.show();
+        
+        const codeElement = document.getElementById('jsonContent');
+        const copyBtn = document.getElementById('copyJsonBtn');
+        codeElement.innerHTML = 'Loading data...';
+        copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i> Copy';
+        
+        fetch('/Scenario/ComparisonData')
+            .then(response => response.json())
+            .then(data => {
+                const formattedJson = JSON.stringify(data, null, 4);
+                codeElement.innerHTML = formattedJson;
+                // Store formatted JSON for copy logic
+                codeElement.setAttribute('data-raw', formattedJson);
+            })
+            .catch(error => {
+                codeElement.innerHTML = 'Error loading JSON data: ' + error.message;
+            });
+    }
+    
+    function copyJsonToClipboard() {
+        const rawJson = document.getElementById('jsonContent').getAttribute('data-raw');
+        if (!rawJson) return;
+        
+        navigator.clipboard.writeText(rawJson).then(() => {
+            const copyBtn = document.getElementById('copyJsonBtn');
+            copyBtn.innerHTML = '<i class="bi bi-check2 text-success me-1"></i> Copied!';
+            setTimeout(() => {
+                copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i> Copy';
+            }, 2000);
+        });
+    }
+</script>
