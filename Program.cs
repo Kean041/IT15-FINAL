@@ -30,6 +30,10 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<FinSightDbContext>();
         var logger = services.GetRequiredService<ILogger<Program>>();
+        
+        // Automatically apply pending migrations on startup
+        await context.Database.MigrateAsync();
+        
         await DbInitializer.InitializeAsync(context, logger);
     }
     catch (Exception ex)

@@ -16,24 +16,27 @@ namespace FinSight.Data
             {
                 logger.LogInformation("Starting database seeding logic...");
 
-                // 1. Seed Super Admin User
-                // Check if the system Super Admin already exists by role or email
+                // 1. Seed Roles into the legacy Roles table if it exists
+                // This prevents FK violations since RoleConstants are used in code but the DB may have a physical constraint.
+                logger.LogInformation("Seeding Roles into legacy table...");
+                await context.Database.ExecuteSqlRawAsync(@"
+                    IF OBJECT_ID('Roles', 'U') IS NOT NULL
+                    BEGIN
+                        -- Ensure roles exist for all constants in RoleConstants.cs
+                        IF NOT EXISTS (SELECT 1 FROM Roles WHERE RoleID = 0) BEGIN SET IDENTITY_INSERT Roles ON; INSERT INTO Roles (RoleID, RoleName) VALUES (0, 'Super Admin'); SET IDENTITY_INSERT Roles OFF; END
+                        IF NOT EXISTS (SELECT 1 FROM Roles WHERE RoleID = 1) BEGIN SET IDENTITY_INSERT Roles ON; INSERT INTO Roles (RoleID, RoleName) VALUES (1, 'Admin'); SET IDENTITY_INSERT Roles OFF; END
+                        IF NOT EXISTS (SELECT 1 FROM Roles WHERE RoleID = 2) BEGIN SET IDENTITY_INSERT Roles ON; INSERT INTO Roles (RoleID, RoleName) VALUES (2, 'Finance Manager'); SET IDENTITY_INSERT Roles OFF; END
+                        IF NOT EXISTS (SELECT 1 FROM Roles WHERE RoleID = 3) BEGIN SET IDENTITY_INSERT Roles ON; INSERT INTO Roles (RoleID, RoleName) VALUES (3, 'Department Head'); SET IDENTITY_INSERT Roles OFF; END
+                        IF NOT EXISTS (SELECT 1 FROM Roles WHERE RoleID = 4) BEGIN SET IDENTITY_INSERT Roles ON; INSERT INTO Roles (RoleID, RoleName) VALUES (4, 'Executive'); SET IDENTITY_INSERT Roles OFF; END
+                    END");
+
+                // 2. Seed Super Admin User
                 bool superAdminExists = await context.Users
-                    .AnyAsync(u => u.RoleID == Roles.SuperAdmin || u.Email == "superadmin@system.com");
+                    .AnyAsync(u => u.Email == "superadmin@system.com");
 
                 if (!superAdminExists)
                 {
                     logger.LogInformation("Super Admin not found. Seeding default Super Admin account...");
-
-                    // WARNING: The physical database contains a legacy FK_Users_Roles constraint despite us moving to RoleConstants.
-                    // We must execute a raw SQL injection strictly for Role 0 to bypass EF Core's FK collision error silently failing!
-                    await context.Database.ExecuteSqlRawAsync(
-                        "IF NOT EXISTS (SELECT 1 FROM Roles WHERE RoleID = 0) " +
-                        "BEGIN " +
-                        "   SET IDENTITY_INSERT Roles ON; " +
-                        "   INSERT INTO Roles (RoleID, RoleName) VALUES (0, 'Super Admin'); " +
-                        "   SET IDENTITY_INSERT Roles OFF; " +
-                        "END");
 
                     var superAdmin = new User
                     {
@@ -41,15 +44,12 @@ namespace FinSight.Data
                         Email = "superadmin@system.com",
                         PasswordHash = PasswordHelper.HashPassword("SuperAdmin123!"),
                         RoleID = Roles.SuperAdmin, // 0
-                        TenantID = null, // System-level user has no tenant lock
+                        TenantID = null,
                         IsArchived = false,
                         CreatedAt = DateTime.Now
                     };
 
                     context.Users.Add(superAdmin);
-                    
-                    // We DO NOT seed a Roles table physically because we leverage the lightweight static 'Roles' constants class (RoleConstants.cs) natively.
-                    
                     await context.SaveChangesAsync();
                     logger.LogInformation("Super Admin seeded successfully.");
                 }
