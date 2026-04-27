@@ -29,5 +29,5 @@ jobs:
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./publish/
-        server-dir: /wwwroot/
+        server-dir: /
         # If your SmarterASP.NET site is in a subfolder like /site/, change server-dir to /site/
