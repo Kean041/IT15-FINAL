@@ -19,7 +19,7 @@ jobs:
 
     - name: Publish app
       run: |
-        dotnet publish FinSight.csproj -c Release -o ./publish --no-self-contained
+        dotnet publish FinSight.csproj -c Release -o ./publish -r win-x86 --self-contained true
         mkdir -p ./publish/logs
 
     - name: Deploy via FTP
