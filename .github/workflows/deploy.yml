@@ -18,7 +18,7 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Publish app
-      run: dotnet publish FinSight.csproj -c Release -o ./publish
+      run: dotnet publish FinSight.csproj -c Release -o ./publish --no-self-contained
 
     - name: Deploy via FTP
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
