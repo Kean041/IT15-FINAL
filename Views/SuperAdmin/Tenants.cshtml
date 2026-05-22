@@ -167,7 +167,7 @@
             <p class="text-muted mb-0">Manage all registered companies, configure settings, and monitor active statuses.</p>
         </div>
         <div>
-            <button class="btn btn-turquoise shadow-sm px-4 py-2">
+            <button class="btn btn-turquoise shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#registerTenantModal">
                 <i class="bi bi-building-add me-2"></i>Register Tenant
             </button>
         </div>
@@ -203,7 +203,21 @@
                 </div>
             </div>
         </div>
-        <!-- Inactive/Suspended -->
+        <!-- Pending -->
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-warning">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Pending</h6>
+                        <h3 class="fw-bold mb-0" style="color: var(--warning);">@Model.PendingTenants</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background: var(--warning-light); width: 48px; height: 48px;">
+                        <i class="bi bi-hourglass-split fs-5" style="color: var(--warning);"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Suspended/Inactive -->
         <div class="col-md-3">
             <div class="analytics-card analytics-card-danger">
                 <div class="d-flex justify-content-between">
@@ -217,7 +231,9 @@
                 </div>
             </div>
         </div>
-        <!-- New Tenants -->
+    </div>
+    <!-- New Tenants This Month -->
+    <div class="row g-4 mb-4">
         <div class="col-md-3">
             <div class="analytics-card analytics-card-navy">
                 <div class="d-flex justify-content-between">
@@ -242,18 +258,19 @@
 
             <form asp-action="Tenants" method="get" class="d-flex align-items-center gap-2 flex-wrap">
                 <!-- Status Filter -->
-                <select name="statusFilter" class="form-select rounded-3 shadow-sm" style="width: 130px;">
+                <select name="statusFilter" class="form-select rounded-3 shadow-sm" style="width: 140px;">
                     <option value="" selected="@(string.IsNullOrEmpty(Model.StatusFilter) ? "selected" : null)">All Status</option>
                     <option value="Active" selected="@(Model.StatusFilter == "Active" ? "selected" : null)">Active</option>
-                    <option value="Inactive" selected="@(Model.StatusFilter == "Inactive" ? "selected" : null)">Inactive</option>
+                    <option value="Pending" selected="@(Model.StatusFilter == "Pending" ? "selected" : null)">Pending</option>
                     <option value="Suspended" selected="@(Model.StatusFilter == "Suspended" ? "selected" : null)">Suspended</option>
+                    <option value="Inactive" selected="@(Model.StatusFilter == "Inactive" ? "selected" : null)">Inactive</option>
                 </select>
 
                 <!-- Plan Filter -->
-                <select name="planFilter" class="form-select rounded-3 shadow-sm" style="width: 140px;">
+                <select name="planFilter" class="form-select rounded-3 shadow-sm" style="width: 150px;">
                     <option value="" selected="@(string.IsNullOrEmpty(Model.PlanFilter) ? "selected" : null)">All Plans</option>
-                    <option value="Starter" selected="@(Model.PlanFilter == "Starter" ? "selected" : null)">Starter</option>
-                    <option value="Professional" selected="@(Model.PlanFilter == "Professional" ? "selected" : null)">Professional</option>
+                    <option value="Basic" selected="@(Model.PlanFilter == "Basic" ? "selected" : null)">Basic</option>
+                    <option value="Premium" selected="@(Model.PlanFilter == "Premium" ? "selected" : null)">Premium</option>
                     <option value="Enterprise" selected="@(Model.PlanFilter == "Enterprise" ? "selected" : null)">Enterprise</option>
                 </select>
 
@@ -292,6 +309,7 @@
                                 var statusBadge = tenant.Status.ToLower() switch
                                 {
                                     "active" => "badge-active",
+                                    "pending" => "badge-inactive",
                                     "inactive" => "badge-inactive",
                                     "suspended" => "badge-suspended",
                                     _ => "badge-inactive"
@@ -315,22 +333,21 @@
                                     <td class="text-end pe-4">
                                         <div class="d-flex justify-content-end gap-1">
                                             <button class="btn btn-sm btn-outline-turquoise" 
-                                                    onclick="openTenantDetailsModal('@tenant.TenantID', '@tenant.CompanyName.Replace("'", "\\'")', '@tenant.AdminEmail', '@tenant.SubscriptionPlan', '@tenant.Status', '@tenant.CreatedDate.ToString("MMM dd, yyyy")')"
+                                                    onclick="openTenantDetailsModal(@tenant.TenantID)"
                                                     title="View Details">
                                                 <i class="bi bi-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-outline-turquoise" title="Edit Tenant">
-                                                <i class="bi bi-pencil-square"></i>
-                                            </button>
                                             @if (tenant.Status.Equals("Active", StringComparison.OrdinalIgnoreCase))
                                             {
-                                                <button class="btn btn-sm btn-soft-danger" title="Suspend Tenant">
+                                                <button type="button" class="btn btn-sm btn-soft-danger" title="Suspend Tenant" 
+                                                        onclick="openStatusModal(@tenant.TenantID, '@tenant.CompanyName.Replace("'", "\\'")', 'Suspended')">
                                                     <i class="bi bi-shield-x"></i>
                                                 </button>
                                             }
                                             else
                                             {
-                                                <button class="btn btn-sm btn-soft-warning" title="Activate Tenant">
+                                                <button type="button" class="btn btn-sm btn-soft-warning" title="Activate Tenant"
+                                                        onclick="openStatusModal(@tenant.TenantID, '@tenant.CompanyName.Replace("'", "\\'")', 'Active')">
                                                     <i class="bi bi-shield-check"></i>
                                                 </button>
                                             }
@@ -386,58 +403,222 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4" style="background:#fff;">
+                <div id="modalLoading" class="text-center py-4"><div class="spinner-border text-turquoise" role="status"></div></div>
+                <div id="modalContent" style="display:none;">
+                    <div class="text-center mb-4 pb-4 border-bottom border-muted" style="border-bottom-style: dashed !important;">
+                        <h4 class="fw-bold text-navy mb-1" id="modalCompany">Company Name</h4>
+                        <span class="badge badge-active mb-2" id="modalStatus">Status</span>
+                        <p class="text-muted small mb-0">Tenant ID: <span class="font-monospace" id="modalId">#0000</span></p>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-5 text-muted small fw-medium"><i class="bi bi-person-fill me-1"></i> Admin Name</div>
+                        <div class="col-7 fw-semibold text-navy text-end" id="modalAdminName">N/A</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-5 text-muted small fw-medium"><i class="bi bi-envelope-at me-1"></i> Admin Email</div>
+                        <div class="col-7 fw-semibold text-navy text-end" id="modalEmail">N/A</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-5 text-muted small fw-medium"><i class="bi bi-box me-1"></i> Subscription Plan</div>
+                        <div class="col-7 fw-semibold text-navy text-end" id="modalPlan">None</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-5 text-muted small fw-medium"><i class="bi bi-people-fill me-1"></i> Total Users</div>
+                        <div class="col-7 fw-semibold text-navy text-end" id="modalUsers">0</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-5 text-muted small fw-medium"><i class="bi bi-stripe me-1"></i> Stripe Customer</div>
+                        <div class="col-7 fw-semibold text-navy text-end small" id="modalStripe">—</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-5 text-muted small fw-medium"><i class="bi bi-calendar-plus me-1"></i> Registered</div>
+                        <div class="col-7 fw-semibold text-navy text-end" id="modalCreated">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-0" style="background:#fff;">
+                <button type="button" class="btn btn-turquoise fw-semibold shadow-sm w-100" data-bs-dismiss="modal" style="border-radius:10px;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ STATUS CONFIRMATION MODAL ═══════════ -->
+<div class="modal fade" id="statusConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-body p-4 text-center">
+                <div id="statusModalIcon" class="mb-3">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 60px; height: 60px; background: rgba(245, 158, 11, 0.1);">
+                        <i class="bi bi-exclamation-triangle-fill fs-2" style="color: var(--warning);"></i>
+                    </div>
+                </div>
+                <h5 class="fw-bold text-navy mb-2" id="statusModalTitle">Confirm Action</h5>
+                <p class="text-muted small mb-4" id="statusModalMessage">Are you sure you want to change this tenant's status?</p>
                 
-                <div class="text-center mb-4 pb-4 border-bottom border-muted" style="border-bottom-style: dashed !important;">
-                    <h4 class="fw-bold text-navy mb-1" id="modalCompany">Company Name</h4>
-                    <span class="badge badge-active mb-2" id="modalStatus">Status</span>
-                    <p class="text-muted small mb-0">Tenant ID: <span class="font-monospace" id="modalId">#0000</span></p>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-envelope-at me-1"></i> Admin Email</div>
-                    <div class="col-7 fw-semibold text-navy text-end" id="modalEmail">admin@email.com</div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-box me-1"></i> Subscription Plan</div>
-                    <div class="col-7 fw-semibold text-navy text-end" id="modalPlan">Plan Name</div>
-                </div>
-                <div class="row mb-2">
-                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-calendar-plus me-1"></i> Registration Date</div>
-                    <div class="col-7 fw-semibold text-navy text-end" id="modalCreated">Jan 01, 2026</div>
-                </div>
-
+                <form asp-action="UpdateTenantStatus" method="post" id="statusModalForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="statusModalTenantId" />
+                    <input type="hidden" name="status" id="statusModalNewStatus" />
+                    
+                    <div class="d-flex gap-2 justify-content-center">
+                        <button type="button" class="btn btn-light shadow-sm w-50" data-bs-dismiss="modal" style="border-radius:10px; font-weight: 500;">Cancel</button>
+                        <button type="submit" class="btn btn-turquoise shadow-sm w-50" id="statusModalSubmitBtn" style="border-radius:10px; font-weight: 500;">Confirm</button>
+                    </div>
+                </form>
             </div>
-            <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex justify-content-between" style="background:#fff;">
-                <button type="button" class="btn btn-outline-turquoise fw-semibold shadow-sm w-100 me-2" style="border-radius:10px;">Login as Tenant</button>
-                <button type="button" class="btn btn-turquoise fw-semibold shadow-sm w-100" data-bs-dismiss="modal" style="border-radius:10px;">Done</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ REGISTER TENANT MODAL ═══════════ -->
+<div class="modal fade" id="registerTenantModal" tabindex="-1" aria-labelledby="registerTenantModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-header border-0" style="background:#080b11;">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle"
+                         style="width:38px;height:38px;background:rgba(5, 130, 142, 0.15);">
+                        <i class="bi bi-building-add" style="color:var(--tq);"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-white mb-0" id="registerTenantModalLabel">Register New Tenant</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+            
+            <form asp-action="RegisterTenant" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-body p-4" style="background:#fff;">
+                    
+                    <h6 class="text-uppercase text-muted fw-bold small mb-3" style="letter-spacing: 1px;">Company Information</h6>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-navy small">Company Name</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-muted text-muted"><i class="bi bi-building"></i></span>
+                            <input type="text" name="CompanyName" class="form-control border-muted" required placeholder="e.g. Acme Corporation" />
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-medium text-navy small">Subscription Plan</label>
+                            <select name="SubscriptionPlan" class="form-select border-muted" required>
+                                <option value="Basic">Basic (₱29/mo)</option>
+                                <option value="Premium">Premium (₱79/mo)</option>
+                                <option value="Enterprise">Enterprise (₱299/mo)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-medium text-navy small">Initial Status</label>
+                            <select name="SubscriptionStatus" class="form-select border-muted" required>
+                                <option value="Active">Active</option>
+                                <option value="Pending">Pending</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <h6 class="text-uppercase text-muted fw-bold small mb-3 border-top pt-3" style="letter-spacing: 1px;">Admin User Account</h6>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-navy small">Admin Full Name</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-muted text-muted"><i class="bi bi-person"></i></span>
+                            <input type="text" name="AdminName" class="form-control border-muted" required placeholder="John Doe" />
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-navy small">Admin Email (Login)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-muted text-muted"><i class="bi bi-envelope"></i></span>
+                            <input type="email" name="AdminEmail" class="form-control border-muted" required placeholder="admin@company.com" />
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-navy small">Temporary Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-muted text-muted"><i class="bi bi-key"></i></span>
+                            <input type="password" name="AdminPassword" class="form-control border-muted" required minlength="8" placeholder="Minimum 8 characters" />
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-top px-4 py-3" style="background:#f8f9fa;">
+                    <button type="button" class="btn btn-light shadow-sm" data-bs-dismiss="modal" style="border-radius:10px;">Cancel</button>
+                    <button type="submit" class="btn btn-turquoise shadow-sm px-4" style="border-radius:10px;">Create Tenant</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
 @section Scripts {
 <script>
-    function openTenantDetailsModal(id, company, email, plan, status, created) {
-        // Populate text
-        document.getElementById('modalId').innerText = "TN-" + id.padStart(4, '0');
-        document.getElementById('modalCompany').innerText = company;
-        document.getElementById('modalEmail').innerText = email;
-        document.getElementById('modalPlan').innerText = plan;
-        document.getElementById('modalCreated').innerText = created;
+    function openTenantDetailsModal(tenantId) {
+        document.getElementById('modalLoading').style.display = 'block';
+        document.getElementById('modalContent').style.display = 'none';
 
-        // Set Tenant Status Badge
-        const statusBadge = document.getElementById('modalStatus');
-        statusBadge.innerText = status;
-        statusBadge.className = 'badge mb-2'; // reset classes
-        
-        const statusLower = status.toLowerCase();
-        if (statusLower === 'active') statusBadge.classList.add('badge-active');
-        else if (statusLower === 'suspended') statusBadge.classList.add('badge-suspended');
-        else if (statusLower === 'inactive') statusBadge.classList.add('badge-inactive');
-        else statusBadge.classList.add('badge-inactive');
-
-        // Show modal
         var modal = new bootstrap.Modal(document.getElementById('tenantDetailsModal'));
+        modal.show();
+
+        fetch('/SuperAdmin/TenantDetails?id=' + tenantId)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('modalId').innerText = 'TN-' + String(data.tenantID).padStart(4, '0');
+                document.getElementById('modalCompany').innerText = data.companyName;
+                document.getElementById('modalAdminName').innerText = data.adminName;
+                document.getElementById('modalEmail').innerText = data.adminEmail;
+                document.getElementById('modalPlan').innerText = data.subscriptionPlan;
+                document.getElementById('modalUsers').innerText = data.totalUsers;
+                document.getElementById('modalStripe').innerText = data.stripeCustomerId || '—';
+                document.getElementById('modalCreated').innerText = data.createdDate ? new Date(data.createdDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—';
+
+                const badge = document.getElementById('modalStatus');
+                badge.innerText = data.subscriptionStatus;
+                badge.className = 'badge mb-2';
+                const s = data.subscriptionStatus.toLowerCase();
+                if (s === 'active') badge.classList.add('badge-active');
+                else if (s === 'suspended') badge.classList.add('badge-suspended');
+                else badge.classList.add('badge-inactive');
+
+                document.getElementById('modalLoading').style.display = 'none';
+                document.getElementById('modalContent').style.display = 'block';
+            })
+            .catch(() => {
+                document.getElementById('modalLoading').innerHTML = '<p class="text-danger">Failed to load tenant details.</p>';
+            });
+    }
+
+    function openStatusModal(tenantId, companyName, newStatus) {
+        document.getElementById('statusModalTenantId').value = tenantId;
+        document.getElementById('statusModalNewStatus').value = newStatus;
+        
+        const isActivating = (newStatus === 'Active');
+        
+        // Update Modal UI
+        document.getElementById('statusModalTitle').innerText = isActivating ? 'Activate Tenant' : 'Suspend Tenant';
+        document.getElementById('statusModalMessage').innerHTML = isActivating 
+            ? `Are you sure you want to grant <strong>${companyName}</strong> full access to the system?`
+            : `Are you sure you want to suspend <strong>${companyName}</strong>? They will be locked out immediately.`;
+            
+        // Style icon & button based on action
+        const iconContainer = document.getElementById('statusModalIcon').firstElementChild;
+        const icon = iconContainer.firstElementChild;
+        const btn = document.getElementById('statusModalSubmitBtn');
+        
+        if (isActivating) {
+            iconContainer.style.background = 'rgba(16, 185, 129, 0.1)';
+            icon.className = 'bi bi-shield-check fs-2 text-success';
+            btn.className = 'btn btn-success shadow-sm w-50';
+            btn.innerText = 'Activate';
+        } else {
+            iconContainer.style.background = 'rgba(226, 109, 92, 0.1)';
+            icon.className = 'bi bi-shield-x fs-2 text-danger';
+            btn.className = 'btn btn-danger shadow-sm w-50';
+            btn.innerText = 'Suspend';
+        }
+        
+        var modal = new bootstrap.Modal(document.getElementById('statusConfirmModal'));
         modal.show();
     }
 </script>

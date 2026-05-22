@@ -19,6 +19,11 @@ namespace FinSight.Data
         public DbSet<Scenario> Scenarios { get; set; }
         public DbSet<ScenarioDetail> ScenarioDetails { get; set; }
         public DbSet<BudgetRequest> BudgetRequests { get; set; }
+        public DbSet<Plan> Plans { get; set; }
+        public DbSet<Subscription> Subscriptions { get; set; }
+        public DbSet<Payment> Payments { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -48,6 +53,13 @@ namespace FinSight.Data
                 .HasOne(sd => sd.Department)
                 .WithMany()
                 .HasForeignKey(sd => sd.DepartmentID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Tenant → Users (one-to-many)
+            modelBuilder.Entity<Tenant>()
+                .HasMany(t => t.Users)
+                .WithOne(u => u.Tenant)
+                .HasForeignKey(u => u.TenantID)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // User → Department (no cascade to avoid multiple cascade paths)
@@ -106,6 +118,63 @@ namespace FinSight.Data
                 .HasOne(br => br.Approver)
                 .WithMany()
                 .HasForeignKey(br => br.ApprovedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // BudgetRequest default values for new columns (safe migration)
+            modelBuilder.Entity<BudgetRequest>()
+                .Property(br => br.Title)
+                .HasDefaultValue("Budget Request");
+
+            modelBuilder.Entity<BudgetRequest>()
+                .Property(br => br.DateNeeded)
+                .HasDefaultValueSql("GETDATE()");
+
+            // ── Subscription relationships ──────────────
+
+            // Subscription → Tenant (no cascade)
+            modelBuilder.Entity<Subscription>()
+                .HasOne(s => s.Tenant)
+                .WithMany(t => t.Subscriptions)
+                .HasForeignKey(s => s.TenantID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Subscription → Plan (no cascade)
+            modelBuilder.Entity<Subscription>()
+                .HasOne(s => s.Plan)
+                .WithMany(p => p.Subscriptions)
+                .HasForeignKey(s => s.PlanID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ── Payment relationships ──────────────────
+
+            // Payment → Tenant (no cascade)
+            modelBuilder.Entity<Payment>()
+                .HasOne(p => p.Tenant)
+                .WithMany(t => t.Payments)
+                .HasForeignKey(p => p.TenantID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Payment → Subscription (cascade)
+            modelBuilder.Entity<Payment>()
+                .HasOne(p => p.Subscription)
+                .WithMany(s => s.Payments)
+                .HasForeignKey(p => p.SubscriptionID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ── AuditLog relationships ───────────────
+
+            // AuditLog → Tenant (no cascade)
+            modelBuilder.Entity<AuditLog>()
+                .HasOne(a => a.Tenant)
+                .WithMany()
+                .HasForeignKey(a => a.TenantID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // AuditLog → User (no cascade)
+            modelBuilder.Entity<AuditLog>()
+                .HasOne(a => a.User)
+                .WithMany()
+                .HasForeignKey(a => a.UserID)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

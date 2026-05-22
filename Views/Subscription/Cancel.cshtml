@@ -1,0 +1,26 @@
+@{
+    Layout = "~/Views/Shared/_IdentityLayout.cshtml";
+    ViewData["Title"] = "Payment Cancelled";
+}
+
+<div class="w-100 text-center" style="max-width: 450px; margin: 0 auto;">
+    
+    <div class="d-inline-flex justify-content-center align-items-center mb-3" style="width: 80px; height: 80px; border-radius: 50%; background: rgba(220, 53, 69, 0.1);">
+        <i class="bi bi-x-circle-fill text-danger" style="font-size: 2.5rem;"></i>
+    </div>
+    
+    <h2 class="auth-title mb-3">Payment Cancelled</h2>
+    
+    <p class="auth-subtitle mb-4">
+        It looks like you cancelled the checkout process. Your subscription remains <strong>inactive</strong> and you cannot access the system until payment is completed.
+    </p>
+
+    <a href="@Url.Action("Checkout", "Subscription")" class="btn btn-primary w-100 mb-3 d-flex justify-content-center align-items-center" style="padding: 14px; font-size: 1.1rem;">
+        <i class="bi bi-arrow-clockwise me-2"></i> Try Again
+    </a>
+
+    <a href="@Url.Action("Logout", "Auth")" class="btn btn-outline-secondary w-100 d-flex justify-content-center align-items-center" style="padding: 14px; font-size: 1.1rem;">
+        <i class="bi bi-box-arrow-left me-2"></i> Log out
+    </a>
+
+</div>

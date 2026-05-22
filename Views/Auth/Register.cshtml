@@ -1,4 +1,5 @@
 @model FinSight.Models.ViewModels.RegisterViewModel
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     Layout = "~/Views/Shared/_IdentityLayout.cshtml";
     ViewData["Title"] = "Create Account";
@@ -8,23 +9,23 @@
 <div class="auth-subtitle">Join us today and streamline your operations.</div>
 
 <!-- Validation Summary -->
-<div asp-validation-summary="All" class="text-danger small mb-3"></div>
+<div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
 
 <form asp-action="Register" asp-controller="Auth" method="post">
     @Html.AntiForgeryToken()
 
-    <!-- Plan (hidden if present) -->
-    @if (!string.IsNullOrEmpty(Model?.Plan))
-    {
-        <input type="hidden" asp-for="Plan" />
-        <div class="mb-3">
-            <label class="form-label">Selected Plan</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-star-fill" style="color: #f59e0b;"></i></span>
-                <input type="text" class="form-control fw-bold" value="@Model.Plan" readonly style="background-color: var(--bg-page);">
-            </div>
+    <!-- Plan Selection Field -->
+    <div class="mb-3">
+        <label asp-for="Plan" class="form-label">Subscription Plan</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-star-fill" style="color: #f59e0b;"></i></span>
+            <select asp-for="Plan" class="form-select fw-bold" style="background-color: var(--input-bg);">
+                <option value="Basic">Basic Plan (₱29/mo)</option>
+                <option value="Premium">Premium Plan (₱79/mo)</option>
+                <option value="Enterprise">Enterprise Plan (₱299/mo)</option>
+            </select>
         </div>
-    }
+    </div>
 
     <!-- Company Name Field -->
     <div class="mb-3">
@@ -67,6 +68,14 @@
             </span>
         </div>
         <span asp-validation-for="Password" class="field-validation-error"></span>
+        <div class="form-text mt-1 small" style="color: var(--text-muted); font-size: 0.8rem;">
+            Your password must:
+            <ul class="mb-0 ps-3 mt-1">
+                <li>Be at least 8 characters long</li>
+                <li>Include uppercase and lowercase letters</li>
+                <li>Contain a number and a special character</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Confirm Password Field -->
@@ -82,6 +91,9 @@
         <span asp-validation-for="ConfirmPassword" class="field-validation-error"></span>
     </div>
 
+    <!-- Cloudflare Turnstile -->
+    <div class="cf-turnstile mb-3 d-flex justify-content-center" data-sitekey="@Configuration["Cloudflare:TurnstileSiteKey"]"></div>
+
     <!-- Register Button -->
     <button type="submit" class="btn btn-primary w-100 py-2 mb-4">
         Create Account <i class="bi bi-arrow-right ms-2"></i>
@@ -93,3 +105,7 @@
         <a asp-controller="Auth" asp-action="Login" class="fw-bold ms-1" style="color: var(--primary);">Login</a>
     </div>
 </form>
+
+@section Scripts {
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+}

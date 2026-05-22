@@ -29,8 +29,8 @@ namespace FinSight.Controllers
         {
             if (!IsAuthenticated) return RedirectToLogin();
 
-            // RBAC: Only Super Admin, Admin, Finance Manager can access Scenario Planning
-            if (!HasRole(Roles.SuperAdmin, Roles.Admin, Roles.FinanceManager))
+            // RBAC: SuperAdmin, Admin, Finance Manager, Department Head can access Scenario Planning
+            if (!CanAccessScenario)
                 return AccessDenied();
 
             int? tenantFilter = GetTenantFilter();
@@ -335,8 +335,8 @@ namespace FinSight.Controllers
         {
             if (!IsAuthenticated) return Unauthorized();
 
-            // RBAC: Only Super Admin, Admin, Finance Manager
-            if (!HasRole(Roles.SuperAdmin, Roles.Admin, Roles.FinanceManager))
+            // RBAC: SuperAdmin, Admin, Finance Manager, Department Head
+            if (!CanAccessScenario)
                 return Unauthorized();
 
             int? tenantFilter = GetTenantFilter();

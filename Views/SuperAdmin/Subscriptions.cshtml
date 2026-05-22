@@ -133,6 +133,7 @@
 .badge-active  { background-color: #d1fae5; color: #065f46; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
 .badge-pending { background-color: #fef3c7; color: #92400e; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
 .badge-expired { background-color: #fee2e2; color: #991b1b; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
+.badge-cancelled { background-color: #e5e7eb; color: #374151; border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
 
 .badge-paid    { background-color: rgba(16, 185, 129, 0.1); color: #10b981; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase;}
 .badge-pay-pending { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase;}
@@ -156,7 +157,7 @@
             <p class="text-muted mb-0">Manage tenant plans, monitor active durations, and handle renewals.</p>
         </div>
         <div>
-            <button class="btn btn-turquoise shadow-sm px-4 py-2">
+            <button class="btn btn-turquoise shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#newSubModal">
                 <i class="bi bi-plus-circle me-2"></i>New Subscription
             </button>
         </div>
@@ -231,18 +232,19 @@
 
             <form asp-action="Subscriptions" method="get" class="d-flex align-items-center gap-2 flex-wrap">
                 <!-- Status Filter -->
-                <select name="statusFilter" class="form-select rounded-3 shadow-sm" style="width: 130px;">
+                <select name="statusFilter" class="form-select rounded-3 shadow-sm" style="width: 140px;">
                     <option value="" selected="@(string.IsNullOrEmpty(Model.StatusFilter) ? "selected" : null)">All Status</option>
                     <option value="Active" selected="@(Model.StatusFilter == "Active" ? "selected" : null)">Active</option>
                     <option value="Pending" selected="@(Model.StatusFilter == "Pending" ? "selected" : null)">Pending</option>
                     <option value="Expired" selected="@(Model.StatusFilter == "Expired" ? "selected" : null)">Expired</option>
+                    <option value="Cancelled" selected="@(Model.StatusFilter == "Cancelled" ? "selected" : null)">Cancelled</option>
                 </select>
 
                 <!-- Plan Filter -->
-                <select name="planFilter" class="form-select rounded-3 shadow-sm" style="width: 140px;">
+                <select name="planFilter" class="form-select rounded-3 shadow-sm" style="width: 150px;">
                     <option value="" selected="@(string.IsNullOrEmpty(Model.PlanFilter) ? "selected" : null)">All Plans</option>
-                    <option value="Starter" selected="@(Model.PlanFilter == "Starter" ? "selected" : null)">Starter</option>
-                    <option value="Professional" selected="@(Model.PlanFilter == "Professional" ? "selected" : null)">Professional</option>
+                    <option value="Basic" selected="@(Model.PlanFilter == "Basic" ? "selected" : null)">Basic</option>
+                    <option value="Premium" selected="@(Model.PlanFilter == "Premium" ? "selected" : null)">Premium</option>
                     <option value="Enterprise" selected="@(Model.PlanFilter == "Enterprise" ? "selected" : null)">Enterprise</option>
                 </select>
 
@@ -291,6 +293,7 @@
                                     "active" => "badge-active",
                                     "pending" => "badge-pending",
                                     "expired" => "badge-expired",
+                                    "cancelled" => "badge-cancelled",
                                     _ => "badge-pending"
                                 };
 
@@ -314,16 +317,24 @@
                                     <td class="text-end pe-4">
                                         <div class="d-flex justify-content-end gap-1">
                                             <button class="btn btn-sm btn-outline-turquoise" 
-                                                    onclick="openSubDetailsModal('@sub.SubscriptionID', '@sub.TenantName', '@sub.PlanName', '@sub.StartDate.ToString("MMM dd, yyyy")', '@sub.EndDate.ToString("MMM dd, yyyy")', '@sub.Status', '@sub.PaymentStatus')"
+                                                    onclick="openSubDetailsModal(@sub.SubscriptionID)"
                                                     title="View Details">
                                                 <i class="bi bi-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-outline-turquoise" title="Renew / Extend">
-                                                <i class="bi bi-arrow-repeat"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-soft-danger" title="Deactivate">
-                                                <i class="bi bi-power"></i>
-                                            </button>
+                                            @if (sub.Status == "Expired" || sub.Status == "Cancelled")
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-turquoise" title="Renew"
+                                                        onclick="openRenewModal(@sub.SubscriptionID, '@sub.TenantName.Replace("'", "\\'")')">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                            }
+                                            @if (sub.Status == "Active")
+                                            {
+                                                <button type="button" class="btn btn-sm btn-soft-danger" title="Cancel Subscription"
+                                                        onclick="openSubStatusModal(@sub.SubscriptionID, '@sub.TenantName.Replace("'", "\\'")', 'Cancelled')">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            }
                                         </div>
                                     </td>
                                 </tr>
@@ -362,7 +373,7 @@
 </div>
 
 <!-- ═══════════ SUBSCRIPTION DETAILS MODAL ═══════════ -->
-<div class="modal fade" id="subDetailsModal" tabindex="-1" aria-labelledby="subDetailsModalLabel" aria-hidden="true">
+<div class="modal fade" id="subDetailsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
             <div class="modal-header border-0" style="background:#080b11;">
@@ -371,77 +382,213 @@
                          style="width:38px;height:38px;background:rgba(5, 130, 142, 0.15);">
                         <i class="bi bi-card-checklist" style="color:var(--tq);"></i>
                     </div>
-                    <h5 class="modal-title fw-bold text-white mb-0" id="subDetailsModalLabel">Subscription Profile</h5>
+                    <h5 class="modal-title fw-bold text-white mb-0">Subscription Profile</h5>
                 </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4" style="background:#fff;">
-                
-                <div class="text-center mb-4 pb-4 border-bottom border-muted" style="border-bottom-style: dashed !important;">
-                    <h4 class="fw-bold text-navy mb-1" id="modalTenant">Company Name</h4>
-                    <span class="badge badge-active mb-2" id="modalStatus">Status</span>
-                    <p class="text-muted small mb-0">Subscription ID: <span class="font-monospace" id="modalId">#0000</span></p>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-box me-1"></i> Plan Tier</div>
-                    <div class="col-7 fw-semibold text-navy text-end" id="modalPlan">Plan Name</div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-calendar-event me-1"></i> Start Date</div>
-                    <div class="col-7 fw-semibold text-navy text-end" id="modalStart">Jan 01, 2026</div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-calendar-x me-1"></i> End Date</div>
-                    <div class="col-7 fw-semibold text-navy text-end" id="modalEnd">Dec 31, 2026</div>
-                </div>
-                <div class="row mb-2">
-                    <div class="col-5 text-muted small fw-medium"><i class="bi bi-credit-card me-1"></i> Payment Status</div>
-                    <div class="col-7 text-end">
-                        <span class="badge badge-paid" id="modalPayStatus">PAID</span>
+                <div id="subModalLoading" class="text-center py-4"><div class="spinner-border text-turquoise" role="status"></div></div>
+                <div id="subModalContent" style="display:none;">
+                    <div class="text-center mb-4 pb-3 border-bottom border-muted" style="border-bottom-style: dashed !important;">
+                        <h4 class="fw-bold text-navy mb-1" id="smCompany">Company</h4>
+                        <span class="badge badge-active mb-2" id="smStatus">Status</span>
+                        <p class="text-muted small mb-0">Subscription #<span class="font-monospace" id="smId">0</span></p>
+                    </div>
+                    <div class="row mb-3"><div class="col-5 text-muted small fw-medium"><i class="bi bi-box me-1"></i> Plan</div><div class="col-7 fw-semibold text-navy text-end" id="smPlan"></div></div>
+                    <div class="row mb-3"><div class="col-5 text-muted small fw-medium"><i class="bi bi-currency-dollar me-1"></i> Price</div><div class="col-7 fw-semibold text-navy text-end" id="smPrice"></div></div>
+                    <div class="row mb-3"><div class="col-5 text-muted small fw-medium"><i class="bi bi-calendar-event me-1"></i> Start Date</div><div class="col-7 fw-semibold text-navy text-end" id="smStart"></div></div>
+                    <div class="row mb-3"><div class="col-5 text-muted small fw-medium"><i class="bi bi-calendar-x me-1"></i> End Date</div><div class="col-7 fw-semibold text-navy text-end" id="smEnd"></div></div>
+                    <div class="row mb-3"><div class="col-5 text-muted small fw-medium"><i class="bi bi-stripe me-1"></i> Stripe Sub</div><div class="col-7 fw-semibold text-navy text-end small" id="smStripe">—</div></div>
+                    
+                    <div id="smPaymentsSection" class="mt-3 pt-3 border-top">
+                        <h6 class="fw-bold text-navy mb-3"><i class="bi bi-receipt me-1 text-turquoise"></i>Recent Payments</h6>
+                        <div id="smPaymentsList"></div>
                     </div>
                 </div>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-0" style="background:#fff;">
+                <button type="button" class="btn btn-turquoise fw-semibold shadow-sm w-100" data-bs-dismiss="modal" style="border-radius:10px;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
+<!-- ═══════════ CANCEL CONFIRMATION MODAL ═══════════ -->
+<div class="modal fade" id="subStatusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-body p-4 text-center">
+                <div class="mb-3">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 60px; height: 60px; background: rgba(226, 109, 92, 0.1);">
+                        <i class="bi bi-x-circle-fill fs-2 text-danger"></i>
+                    </div>
+                </div>
+                <h5 class="fw-bold text-navy mb-2">Cancel Subscription</h5>
+                <p class="text-muted small mb-4" id="subStatusMessage">Are you sure?</p>
+                <form asp-action="UpdateSubscriptionStatus" asp-controller="SuperAdmin" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="subStatusId" />
+                    <input type="hidden" name="status" id="subStatusValue" />
+                    <div class="d-flex gap-2 justify-content-center">
+                        <button type="button" class="btn btn-light shadow-sm w-50" data-bs-dismiss="modal" style="border-radius:10px;">Keep</button>
+                        <button type="submit" class="btn btn-danger shadow-sm w-50" style="border-radius:10px;">Cancel It</button>
+                    </div>
+                </form>
             </div>
-            <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex justify-content-between" style="background:#fff;">
-                <button type="button" class="btn btn-outline-turquoise fw-semibold shadow-sm w-100 me-2" style="border-radius:10px;">View Billing History</button>
-                <button type="button" class="btn btn-turquoise fw-semibold shadow-sm w-100" data-bs-dismiss="modal" style="border-radius:10px;">Done</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ RENEW CONFIRMATION MODAL ═══════════ -->
+<div class="modal fade" id="renewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-body p-4 text-center">
+                <div class="mb-3">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 60px; height: 60px; background: rgba(16, 185, 129, 0.1);">
+                        <i class="bi bi-arrow-repeat fs-2 text-success"></i>
+                    </div>
+                </div>
+                <h5 class="fw-bold text-navy mb-2">Renew Subscription</h5>
+                <p class="text-muted small mb-4" id="renewMessage">Extend by 1 month?</p>
+                <form asp-action="RenewSubscription" asp-controller="SuperAdmin" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" id="renewSubId" />
+                    <div class="d-flex gap-2 justify-content-center">
+                        <button type="button" class="btn btn-light shadow-sm w-50" data-bs-dismiss="modal" style="border-radius:10px;">Cancel</button>
+                        <button type="submit" class="btn btn-success shadow-sm w-50" style="border-radius:10px;">Renew</button>
+                    </div>
+                </form>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ NEW SUBSCRIPTION MODAL ═══════════ -->
+<div class="modal fade" id="newSubModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-header border-0" style="background:#080b11;">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center justify-content-center rounded-circle"
+                         style="width:38px;height:38px;background:rgba(5, 130, 142, 0.15);">
+                        <i class="bi bi-plus-circle" style="color:var(--tq);"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-white mb-0">Create Subscription</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <form asp-action="CreateSubscription" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-body p-4" style="background:#fff;">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-navy small">Select Tenant</label>
+                        <select name="tenantId" class="form-select border-muted" required>
+                            <option value="">Select a Tenant</option>
+                            @if (ViewBag.AvailableTenants != null)
+                            {
+                                foreach (var t in ViewBag.AvailableTenants)
+                                {
+                                    <option value="@t.TenantID">@t.CompanyName</option>
+                                }
+                            }
+                        </select>
+                        <div class="form-text small text-muted">Only tenants without an active subscription should be selected.</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-medium text-navy small">Select Plan</label>
+                        <select name="planId" class="form-select border-muted" required>
+                            <option value="">Select a Plan</option>
+                            @if (ViewBag.Plans != null)
+                            {
+                                foreach (var p in ViewBag.Plans)
+                                {
+                                    <option value="@p.PlanID">@p.PlanName (₱@p.Price/mo)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <div class="alert alert-info border-0" style="background: var(--tq-light); color: var(--tq-dark); border-radius: 10px;">
+                        <i class="bi bi-info-circle me-2"></i>This will manually create an Active subscription valid for 1 month and a "Manual" payment record.
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-top px-4 py-3" style="background:#f8f9fa;">
+                    <button type="button" class="btn btn-light shadow-sm" data-bs-dismiss="modal" style="border-radius:10px;">Cancel</button>
+                    <button type="submit" class="btn btn-turquoise shadow-sm px-4" style="border-radius:10px;">Create Subscription</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
 @section Scripts {
 <script>
-    function openSubDetailsModal(id, tenant, plan, start, end, status, payStatus) {
-        // Populate text
-        document.getElementById('modalId').innerText = "#" + id;
-        document.getElementById('modalTenant').innerText = tenant;
-        document.getElementById('modalPlan').innerText = plan;
-        document.getElementById('modalStart').innerText = start;
-        document.getElementById('modalEnd').innerText = end;
-
-        // Set Subscription Status Badge
-        const statusBadge = document.getElementById('modalStatus');
-        statusBadge.innerText = status;
-        statusBadge.className = 'badge mb-2'; // reset
-        const statusLower = status.toLowerCase();
-        if (statusLower === 'active') statusBadge.classList.add('badge-active');
-        else if (statusLower === 'pending') statusBadge.classList.add('badge-pending');
-        else if (statusLower === 'expired') statusBadge.classList.add('badge-expired');
-        else statusBadge.classList.add('badge-pending');
-
-        // Set Payment Status Badge
-        const payBadge = document.getElementById('modalPayStatus');
-        payBadge.innerText = payStatus;
-        payBadge.className = 'badge'; // reset
-        const payLower = payStatus.toLowerCase();
-        if (payLower === 'paid') payBadge.classList.add('badge-paid');
-        else if (payLower === 'failed') payBadge.classList.add('badge-failed');
-        else payBadge.classList.add('badge-pay-pending');
-
-        // Show modal
+    function openSubDetailsModal(subId) {
+        document.getElementById('subModalLoading').style.display = 'block';
+        document.getElementById('subModalContent').style.display = 'none';
         var modal = new bootstrap.Modal(document.getElementById('subDetailsModal'));
+        modal.show();
+
+        fetch('/SuperAdmin/SubscriptionDetails?id=' + subId)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('smId').innerText = data.subscriptionID;
+                document.getElementById('smCompany').innerText = data.companyName;
+                document.getElementById('smPlan').innerText = data.planName;
+                document.getElementById('smPrice').innerText = '₱' + data.planPrice.toFixed(2) + '/mo';
+                document.getElementById('smStart').innerText = new Date(data.startDate).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'});
+                document.getElementById('smEnd').innerText = new Date(data.endDate).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'});
+                document.getElementById('smStripe').innerText = data.stripeSubscriptionID || '—';
+
+                const badge = document.getElementById('smStatus');
+                badge.innerText = data.status;
+                badge.className = 'badge mb-2';
+                const s = data.status.toLowerCase();
+                if (s === 'active') badge.classList.add('badge-active');
+                else if (s === 'expired') badge.classList.add('badge-expired');
+                else if (s === 'cancelled') badge.classList.add('badge-cancelled');
+                else badge.classList.add('badge-pending');
+
+                // Render payments
+                const payList = document.getElementById('smPaymentsList');
+                if (data.recentPayments && data.recentPayments.length > 0) {
+                    payList.innerHTML = data.recentPayments.map(p => {
+                        const pBadge = p.paymentStatus === 'Paid' ? 'badge-paid' : (p.paymentStatus === 'Failed' ? 'badge-failed' : 'badge-pay-pending');
+                        return `<div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded" style="background:#f8f9fa;">
+                            <div><span class="fw-medium small text-navy">₱${p.amount.toFixed(2)}</span> <span class="text-muted small">• ${p.paymentMethod}</span></div>
+                            <div><span class="badge ${pBadge}">${p.paymentStatus}</span></div>
+                        </div>`;
+                    }).join('');
+                    document.getElementById('smPaymentsSection').style.display = 'block';
+                } else {
+                    payList.innerHTML = '<p class="text-muted small">No payments recorded.</p>';
+                }
+
+                document.getElementById('subModalLoading').style.display = 'none';
+                document.getElementById('subModalContent').style.display = 'block';
+            })
+            .catch(() => {
+                document.getElementById('subModalLoading').innerHTML = '<p class="text-danger">Failed to load details.</p>';
+            });
+    }
+
+    function openSubStatusModal(subId, companyName, newStatus) {
+        document.getElementById('subStatusId').value = subId;
+        document.getElementById('subStatusValue').value = newStatus;
+        document.getElementById('subStatusMessage').innerHTML = `Cancel <strong>${companyName}</strong>'s subscription? They will lose access immediately.`;
+        var modal = new bootstrap.Modal(document.getElementById('subStatusModal'));
+        modal.show();
+    }
+
+    function openRenewModal(subId, companyName) {
+        document.getElementById('renewSubId').value = subId;
+        document.getElementById('renewMessage').innerHTML = `Renew <strong>${companyName}</strong>'s subscription for 1 month?`;
+        var modal = new bootstrap.Modal(document.getElementById('renewModal'));
         modal.show();
     }
 </script>

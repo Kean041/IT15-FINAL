@@ -17,5 +17,23 @@ namespace FinSight.Models
 
         [StringLength(50)]
         public string? SubscriptionPlan { get; set; }
+
+        [StringLength(100)]
+        public string? StripeCustomerId { get; set; }
+
+        [StringLength(100)]
+        public string? StripeSubscriptionId { get; set; }
+
+        [StringLength(50)]
+        public string? SubscriptionStatus { get; set; } = "Pending"; // "Active", "PastDue", "Canceled"
+
+        // Navigation property — all users belonging to this tenant
+        public ICollection<User> Users { get; set; } = new List<User>();
+
+        // Navigation property — subscriptions for this tenant
+        public ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
+
+        // Navigation property — payments for this tenant
+        public ICollection<Payment> Payments { get; set; } = new List<Payment>();
     }
 }

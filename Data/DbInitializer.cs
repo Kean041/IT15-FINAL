@@ -1,17 +1,15 @@
 using FinSight.Helpers;
 using FinSight.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace FinSight.Data
 {
     public static class DbInitializer
     {
-        public static async Task InitializeAsync(FinSightDbContext context, ILogger logger)
+        public static async Task InitializeAsync(FinSightDbContext context, ILogger logger, IConfiguration configuration)
         {
-            // Optional: Ensure database is created (Warning: Not ideal if using Migrations strictly in prod, but safe here)
-            // await context.Database.EnsureCreatedAsync();
-
             try
             {
                 logger.LogInformation("Starting database seeding logic...");
@@ -36,22 +34,30 @@ namespace FinSight.Data
 
                 if (!superAdminExists)
                 {
-                    logger.LogInformation("Super Admin not found. Seeding default Super Admin account...");
-
-                    var superAdmin = new User
+                    var superAdminPassword = configuration["SeedUsers:SuperAdminPassword"];
+                    if (string.IsNullOrWhiteSpace(superAdminPassword))
                     {
-                        FullName = "Super Admin",
-                        Email = "superadmin@system.com",
-                        PasswordHash = PasswordHelper.HashPassword("SuperAdmin123!"),
-                        RoleID = Roles.SuperAdmin, // 0
-                        TenantID = null,
-                        IsArchived = false,
-                        CreatedAt = DateTime.Now
-                    };
+                        logger.LogWarning("Super Admin seed skipped because SeedUsers:SuperAdminPassword is not configured.");
+                    }
+                    else
+                    {
+                        logger.LogInformation("Super Admin not found. Seeding configured Super Admin account...");
 
-                    context.Users.Add(superAdmin);
-                    await context.SaveChangesAsync();
-                    logger.LogInformation("Super Admin seeded successfully.");
+                        var superAdmin = new User
+                        {
+                            FullName = "Super Admin",
+                            Email = "superadmin@system.com",
+                            PasswordHash = PasswordHelper.HashPassword(superAdminPassword),
+                            RoleID = Roles.SuperAdmin, // 0
+                            TenantID = null,
+                            IsArchived = false,
+                            CreatedAt = DateTime.Now
+                        };
+
+                        context.Users.Add(superAdmin);
+                        await context.SaveChangesAsync();
+                        logger.LogInformation("Super Admin seeded successfully.");
+                    }
                 }
                 else
                 {

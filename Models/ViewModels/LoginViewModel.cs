@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace FinSight.Models.ViewModels
 {
@@ -14,6 +15,7 @@ namespace FinSight.Models.ViewModels
         [Display(Name = "Password")]
         public string Password { get; set; } = string.Empty;
 
+        [JsonRequired]
         [Display(Name = "Remember me?")]
         public bool RememberMe { get; set; }
     }

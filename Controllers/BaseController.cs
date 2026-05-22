@@ -24,8 +24,14 @@ namespace FinSight.Controllers
         /// <summary>Current user's TenantID from session, or null if not logged in.</summary>
         protected int? CurrentTenantID => HttpContext.Session.GetInt32("TenantID");
 
+        /// <summary>Current user's DepartmentID from session, or null if not assigned.</summary>
+        protected int? CurrentDepartmentID => HttpContext.Session.GetInt32("DepartmentID");
+
         /// <summary>Current user's full name from session.</summary>
         protected string CurrentFullName => HttpContext.Session.GetString("FullName") ?? "Unknown";
+
+        /// <summary>Current user's subscription status from session.</summary>
+        protected string CurrentSubscriptionStatus => HttpContext.Session.GetString("SubscriptionStatus") ?? "Pending";
 
         // ─────────────────────────────────────────────
         // Role Checks
@@ -46,6 +52,48 @@ namespace FinSight.Controllers
         /// </summary>
         protected bool IsAuthenticated =>
             CurrentUserID != null && CurrentRoleID != null && CurrentTenantID != null;
+
+        // ─────────────────────────────────────────────
+        // Action Filter / Interceptor
+        // ─────────────────────────────────────────────
+
+        public override void OnActionExecuting(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context)
+        {
+            base.OnActionExecuting(context);
+
+            var controllerName = context.RouteData.Values["controller"]?.ToString();
+            // ── Intercept pending 2FA sessions ──
+            // User has passed password check but hasn't completed OTP verification yet
+            var pending2FAUserId = HttpContext.Session.GetInt32("Pending2FA_UserID");
+            if (pending2FAUserId != null && !IsAuthenticated)
+            {
+                // Allow access to Auth controller only (VerifyOtp, ResendOtp, Login, Logout)
+                if (controllerName != "Auth")
+                {
+                    context.Result = RedirectToAction("VerifyOtp", "Auth");
+                    return;
+                }
+            }
+
+            // ── Redirect unauthenticated users to Login ──
+            if (!IsAuthenticated)
+            {
+                if (controllerName != "Auth" && controllerName != "Home" && controllerName != "Subscription")
+                {
+                    context.Result = RedirectToLogin();
+                    return;
+                }
+            }
+
+            if (IsAuthenticated && !IsSuperAdmin && CurrentSubscriptionStatus != "Active")
+            {
+                // Prevent infinite redirect if already going to SubscriptionController or AuthController
+                if (controllerName != "Subscription" && controllerName != "Auth")
+                {
+                    context.Result = RedirectToAction("Pending", "Subscription");
+                }
+            }
+        }
 
         /// <summary>
         /// Returns a redirect to the login page.
@@ -104,8 +152,24 @@ namespace FinSight.Controllers
         protected bool CanApproveRequests =>
             CurrentRoleID != null && Roles.CanApprove(CurrentRoleID.Value);
 
+        /// <summary>Can this role manage (Create/Edit/Delete) budget allocations? (Admin/SuperAdmin only)</summary>
+        protected bool CanManageAllocations =>
+            CurrentRoleID != null && Roles.CanManageAllocations(CurrentRoleID.Value);
+
         /// <summary>Can this role submit budget requests? (Department Head only)</summary>
         protected bool CanSubmitBudgetRequests =>
             CurrentRoleID != null && Roles.CanSubmitBudgetRequest(CurrentRoleID.Value);
+
+        /// <summary>Can this role access Financial Forecasting? (Finance Manager / Admin / SuperAdmin)</summary>
+        protected bool CanAccessForecasting =>
+            CurrentRoleID != null && Roles.CanAccessForecasting(CurrentRoleID.Value);
+
+        /// <summary>Can this role access Variance Analysis? (Finance Manager / Admin / SuperAdmin)</summary>
+        protected bool CanAccessAnalysis =>
+            CurrentRoleID != null && Roles.CanAccessAnalysis(CurrentRoleID.Value);
+
+        /// <summary>Can this role access Scenario Planning? (Finance Manager / Admin / SuperAdmin / DeptHead)</summary>
+        protected bool CanAccessScenario =>
+            CurrentRoleID != null && Roles.CanAccessScenario(CurrentRoleID.Value);
     }
 }

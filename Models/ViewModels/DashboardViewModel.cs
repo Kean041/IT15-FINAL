@@ -30,6 +30,9 @@ namespace FinSight.Models.ViewModels
         // ── User Info ──────────────────────────────────
         public string UserName { get; set; } = string.Empty;
         public string RoleName { get; set; } = string.Empty;
+
+        // ── Alpha Vantage Market Data ──────────────────
+        public MarketDataViewModel? MarketData { get; set; }
     }
 
     /// <summary>

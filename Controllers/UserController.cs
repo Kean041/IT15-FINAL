@@ -1,6 +1,8 @@
 using FinSight.Data;
 using FinSight.Helpers;
 using FinSight.Models;
+using FinSight.Models.ViewModels;
+using FinSight.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -14,10 +16,14 @@ namespace FinSight.Controllers
     public class UserController : BaseController
     {
         private readonly FinSightDbContext _context;
+        private readonly AuditLogService _auditLog;
+        private readonly NotificationService _notification;
 
-        public UserController(FinSightDbContext context)
+        public UserController(FinSightDbContext context, AuditLogService auditLog, NotificationService notification)
         {
             _context = context;
+            _auditLog = auditLog;
+            _notification = notification;
         }
 
         // ─────────────────────────────────────────────
@@ -34,7 +40,7 @@ namespace FinSight.Controllers
             var query = _context.Users
                 .Include(u => u.Department)
                 .Include(u => u.Tenant)
-                .Where(u => u.IsArchived == false)
+                .Where(u => !u.IsArchived)
                 .AsQueryable();
 
             // Apply tenant filter (Super Admin sees all)
@@ -59,10 +65,10 @@ namespace FinSight.Controllers
                 .Where(u => tenantFilter == null || u.TenantID == tenantFilter.Value)
                 .CountAsync();
             int activeCount = await _context.Users
-                .Where(u => (tenantFilter == null || u.TenantID == tenantFilter.Value) && u.IsArchived == false)
+                .Where(u => (tenantFilter == null || u.TenantID == tenantFilter.Value) && !u.IsArchived)
                 .CountAsync();
             int archivedCount = await _context.Users
-                .Where(u => (tenantFilter == null || u.TenantID == tenantFilter.Value) && u.IsArchived == true)
+                .Where(u => (tenantFilter == null || u.TenantID == tenantFilter.Value) && u.IsArchived)
                 .CountAsync();
 
             ViewBag.TotalUsers = totalUsersInTenant;
@@ -103,7 +109,7 @@ namespace FinSight.Controllers
             var query = _context.Users
                 .Include(u => u.Department)
                 .Include(u => u.Tenant)
-                .Where(u => u.IsArchived == true)
+                .Where(u => u.IsArchived)
                 .AsQueryable();
 
             if (tenantFilter != null)
@@ -189,6 +195,17 @@ namespace FinSight.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
+            // Audit: User Created
+            await _auditLog.LogSystemAction(tenantId, CurrentUserID,
+                "UserCreated", $"User '{user.FullName}' ({user.Email}) created with role '{Roles.GetRoleName(assignedRole)}'.",
+                HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            // Notify Admin
+            await _notification.CreateNotificationAsync(tenantId, null, "System", 
+                "User Created", 
+                $"New user '{user.FullName}' was created.", 
+                "/User");
+
             TempData["Success"] = $"User \"{user.FullName}\" created successfully.";
             return RedirectToAction(nameof(Index));
         }
@@ -237,6 +254,11 @@ namespace FinSight.Controllers
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
 
+            // Audit: User Updated
+            await _auditLog.LogSystemAction(CurrentTenantID, CurrentUserID,
+                "UserUpdated", $"User '{user.FullName}' (ID: {user.UserID}) updated.",
+                HttpContext.Connection.RemoteIpAddress?.ToString());
+
             TempData["Success"] = $"User \"{user.FullName}\" updated successfully.";
             return RedirectToAction(nameof(Index));
         }
@@ -275,7 +297,18 @@ namespace FinSight.Controllers
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
 
-            TempData["Success"] = $"User \"{user.FullName}\" has been archived.";
+            // Audit: User Archived
+            await _auditLog.LogSystemAction(CurrentTenantID, CurrentUserID,
+                "UserArchived", $"User '{user.FullName}' ({user.Email}) archived.",
+                HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            // Notify Admin
+            await _notification.CreateNotificationAsync(user.TenantID, null, "System", 
+                "User Archived", 
+                $"User '{user.FullName}' has been archived.", 
+                "/User/Archived");
+
+            TempData["Success"] = $"User \"{user.FullName}\" archived successfully.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -305,6 +338,11 @@ namespace FinSight.Controllers
 
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
+
+            // Audit: User Restored
+            await _auditLog.LogSystemAction(CurrentTenantID, CurrentUserID,
+                "UserRestored", $"User '{user.FullName}' (ID: {user.UserID}) restored.",
+                HttpContext.Connection.RemoteIpAddress?.ToString());
 
             TempData["Success"] = $"User \"{user.FullName}\" has been restored.";
             return RedirectToAction(nameof(Archived));
@@ -338,7 +376,70 @@ namespace FinSight.Controllers
             return Json(new { id = dept.DepartmentID, name = dept.DepartmentName });
         }
 
+        // ─────────────────────────────────────────────
+        // POST: User/ToggleTwoFactor  — Admin 2FA toggle
+        // ─────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleTwoFactor(int id)
+        {
+            if (!IsAuthenticated) return RedirectToLogin();
+            if (!HasRole(Roles.SuperAdmin, Roles.Admin)) return AccessDenied();
 
+            int? tenantFilter = GetTenantFilter();
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.UserID == id && (tenantFilter == null || u.TenantID == tenantFilter.Value));
+
+            if (user == null)
+            {
+                TempData["Error"] = "User not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var roleId = user.RoleID ?? 1;
+
+            // Prevent disabling 2FA for mandatory roles
+            if (Roles.RequiresTwoFactor(roleId) && user.IsTwoFactorEnabled)
+            {
+                TempData["Error"] = $"2FA is mandatory for {Roles.GetRoleName(roleId)} and cannot be disabled.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            // Toggle 2FA
+            user.IsTwoFactorEnabled = !user.IsTwoFactorEnabled;
+
+            // Clear OTP data when disabling
+            if (!user.IsTwoFactorEnabled)
+            {
+                user.OTPCode = null;
+                user.OTPExpiration = null;
+                user.FailedOTPAttempts = 0;
+                user.OTPLockoutEnd = null;
+            }
+
+            user.UpdatedAt = DateTime.Now;
+            _context.Update(user);
+            await _context.SaveChangesAsync();
+
+            var action = user.IsTwoFactorEnabled ? "enabled" : "disabled";
+
+            // Audit
+            await _auditLog.LogSecurityAction(user.TenantID, CurrentUserID,
+                user.IsTwoFactorEnabled ? "TwoFactorEnabled" : "TwoFactorDisabled",
+                $"2FA {action} for user '{user.FullName}' by admin.",
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                user.IsTwoFactorEnabled ? "Info" : "Warning");
+
+            // Notify the affected user
+            await _notification.CreateNotificationAsync(user.TenantID, user.UserID, "Security",
+                $"Two-Factor Authentication {(user.IsTwoFactorEnabled ? "Enabled" : "Disabled")}",
+                $"An administrator has {action} Two-Factor Authentication on your account.",
+                null);
+
+            TempData["Success"] = $"2FA has been {action} for \"{user.FullName}\".";
+            return RedirectToAction(nameof(Index));
+        }
 
         // ─────────────────────────────────────────────
         // Helper: Populate Role + Department Dropdowns
@@ -365,6 +466,141 @@ namespace FinSight.Controllers
                     Value = d.DepartmentID.ToString(),
                     Text = d.DepartmentName
                 }).ToListAsync();
+        }
+        // ═════════════════════════════════════════════
+        // AUDIT LOGS — SPLIT INTO SYSTEM & SECURITY
+        // ═════════════════════════════════════════════
+
+        public async Task<IActionResult> SystemLogs(
+            string? severity, string? search,
+            DateTime? startDate, DateTime? endDate, int page = 1)
+        {
+            return await BuildAuditLogView("System", severity, search, startDate, endDate, page);
+        }
+
+        public async Task<IActionResult> SecurityLogs(
+            string? severity, string? search,
+            DateTime? startDate, DateTime? endDate, int page = 1)
+        {
+            return await BuildAuditLogView("Security", severity, search, startDate, endDate, page);
+        }
+
+        private async Task<IActionResult> BuildAuditLogView(
+            string logType, string? severity, string? search,
+            DateTime? startDate, DateTime? endDate, int page)
+        {
+            if (!IsAuthenticated) return RedirectToLogin();
+            if (!HasRole(Roles.SuperAdmin, Roles.Admin)) return AccessDenied();
+
+            const int pageSize = 20;
+            int? tenantId = GetTenantFilter();
+
+            var allLogs = await _context.AuditLogs
+                .Include(a => a.User)
+                .Where(a => a.LogType == logType && (tenantId == null || a.TenantID == tenantId))
+                .OrderByDescending(a => a.CreatedAt)
+                .ToListAsync();
+
+            // KPI counts
+            int totalAll = allLogs.Count;
+            int infoCount = allLogs.Count(a => a.Severity == "Info");
+            int warningCount = allLogs.Count(a => a.Severity == "Warning");
+            int criticalCount = allLogs.Count(a => a.Severity == "Critical");
+
+            // Apply filters
+            var query = allLogs.AsEnumerable();
+
+            if (!string.IsNullOrEmpty(severity))
+                query = query.Where(a => a.Severity == severity);
+
+            if (startDate.HasValue)
+                query = query.Where(a => a.CreatedAt >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(a => a.CreatedAt <= endDate.Value.AddDays(1));
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var s = search.ToLower();
+                query = query.Where(a =>
+                    (a.Action?.ToLower().Contains(s) == true) ||
+                    (a.Details?.ToLower().Contains(s) == true) ||
+                    (a.User?.FullName?.ToLower().Contains(s) == true)
+                );
+            }
+
+            var filtered = query.ToList();
+            int totalFiltered = filtered.Count;
+            int totalPages = (int)Math.Ceiling(totalFiltered / (double)pageSize);
+            if (page < 1) page = 1;
+            if (page > totalPages && totalPages > 0) page = totalPages;
+
+            var pagedLogs = filtered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(a => new AuditLogItem
+                {
+                    AuditLogID = a.AuditLogID,
+                    LogType = a.LogType,
+                    Severity = a.Severity,
+                    Action = a.Action,
+                    Details = a.Details,
+                    IPAddress = a.IPAddress,
+                    CreatedAt = a.CreatedAt,
+                    UserName = a.User?.FullName ?? "System"
+                }).ToList();
+
+            var vm = new AuditLogViewModel
+            {
+                TotalLogs = totalAll,
+                SystemLogs = infoCount,
+                SecurityLogs = warningCount,
+                CriticalLogs = criticalCount,
+                Logs = pagedLogs,
+                LogTypeFilter = logType,
+                SeverityFilter = severity,
+                SearchQuery = search,
+                StartDate = startDate,
+                EndDate = endDate,
+                CurrentPage = page,
+                TotalPages = totalPages,
+                PageSize = pageSize
+            };
+
+            return View(logType == "System" ? "SystemLogs" : "SecurityLogs", vm);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetLogDetails(int id)
+        {
+            if (!IsAuthenticated) return Unauthorized();
+            if (!HasRole(Roles.SuperAdmin, Roles.Admin)) return Forbid();
+
+            int? tenantId = GetTenantFilter();
+
+            var log = await _context.AuditLogs
+                .Include(a => a.User)
+                .FirstOrDefaultAsync(a => a.AuditLogID == id && (tenantId == null || a.TenantID == tenantId));
+
+            if (log == null)
+                return Json(new { success = false });
+
+            return Json(new
+            {
+                success = true,
+                data = new AuditLogDetailItem
+                {
+                    AuditLogID = log.AuditLogID,
+                    LogType = log.LogType,
+                    Severity = log.Severity,
+                    Action = log.Action,
+                    Details = log.Details,
+                    IPAddress = log.IPAddress,
+                    CreatedAt = log.CreatedAt,
+                    UserName = log.User?.FullName ?? "System",
+                    UserEmail = log.User?.Email ?? "—"
+                }
+            });
         }
     }
 }

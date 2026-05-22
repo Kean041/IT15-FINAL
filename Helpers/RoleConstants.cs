@@ -68,12 +68,67 @@ namespace FinSight.Helpers
         }
 
         /// <summary>
+        /// Returns true if the role can manage (Create/Edit/Delete) budget allocations.
+        /// Only Super Admin and Admin can manage allocations.
+        /// </summary>
+        public static bool CanManageAllocations(int roleId)
+        {
+            return roleId == SuperAdmin
+                || roleId == Admin;
+        }
+
+        /// <summary>
         /// Returns true if the role can submit budget requests.
         /// Only Department Heads can submit.
         /// </summary>
         public static bool CanSubmitBudgetRequest(int roleId)
         {
             return roleId == DepartmentHead;
+        }
+
+        /// <summary>
+        /// Returns true if the role mandates Two-Factor Authentication.
+        /// High-privilege roles (Super Admin, Admin, Finance Manager) always require 2FA.
+        /// </summary>
+        public static bool RequiresTwoFactor(int roleId)
+        {
+            return roleId == SuperAdmin
+                || roleId == Admin
+                || roleId == FinanceManager;
+        }
+
+        /// <summary>
+        /// Returns true if the role can access Financial Forecasting.
+        /// Only Finance Manager (+ SuperAdmin/Admin for system oversight) can perform forecasting.
+        /// </summary>
+        public static bool CanAccessForecasting(int roleId)
+        {
+            return roleId == SuperAdmin
+                || roleId == Admin
+                || roleId == FinanceManager;
+        }
+
+        /// <summary>
+        /// Returns true if the role can access Variance Analysis.
+        /// Only Finance Manager (+ SuperAdmin/Admin for system oversight) can perform analysis.
+        /// </summary>
+        public static bool CanAccessAnalysis(int roleId)
+        {
+            return roleId == SuperAdmin
+                || roleId == Admin
+                || roleId == FinanceManager;
+        }
+
+        /// <summary>
+        /// Returns true if the role can participate in Scenario Planning.
+        /// Finance Manager prepares scenarios; Department Heads participate.
+        /// </summary>
+        public static bool CanAccessScenario(int roleId)
+        {
+            return roleId == SuperAdmin
+                || roleId == Admin
+                || roleId == FinanceManager
+                || roleId == DepartmentHead;
         }
     }
 }

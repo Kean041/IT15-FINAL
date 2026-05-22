@@ -164,6 +164,70 @@
         </div>
     </div>
 
+    <!-- ═══════════ ECONOMIC INDICATORS ═══════════ -->
+    @{
+        var econData = ViewBag.EconomicData as FinSight.Models.ViewModels.EconomicDataViewModel;
+    }
+    @if (econData != null && !econData.HasError)
+    {
+        <div class="card-dashboard mb-4" style="background: linear-gradient(to right, #ffffff, #f8fafc);">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-navy mb-0 ps-1">
+                    <i class="bi bi-globe2 me-2 text-turquoise"></i>Macroeconomic Indicators
+                </h5>
+                <span class="d-flex align-items-center gap-2" style="font-size: 0.75rem; font-weight: 500; color: var(--muted-clr);">
+                    <span class="live-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block; position: relative;"></span>
+                    <span>Live via Alpha Vantage</span>
+                </span>
+            </div>
+            
+            <div class="row g-3">
+                @foreach (var ind in econData.All)
+                {
+                    <div class="col-xl-3 col-md-6">
+                        <div style="background: #fff; border: 1px solid rgba(0,0,0,0.05); border-radius: 12px; padding: 16px; position: relative; overflow: hidden;">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">@ind.Name</span>
+                                <i class="bi @ind.Icon fs-5 text-@ind.ColorClass" style="opacity: 0.8;"></i>
+                            </div>
+                            <div class="d-flex align-items-baseline gap-2">
+                                <h3 class="fw-bold text-navy mb-0" style="font-family: 'Inter', monospace;">
+                                    @ind.LatestValue?.ToString("N2")<span style="font-size: 1rem; color: #6b7280; font-weight: 600; margin-left: 2px;">@ind.Unit</span>
+                                </h3>
+                                
+                                @if (ind.Trend == "up")
+                                {
+                                    <span style="color: #10b981; font-size: 0.75rem; font-weight: 600; background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px;">
+                                        <i class="bi bi-arrow-up-short"></i>@ind.Change?.ToString("N2")
+                                    </span>
+                                }
+                                else if (ind.Trend == "down")
+                                {
+                                    <span style="color: #ef4444; font-size: 0.75rem; font-weight: 600; background: rgba(239,68,68,0.1); padding: 2px 6px; border-radius: 4px;">
+                                        <i class="bi bi-arrow-down-short"></i>@Math.Abs(ind.Change ?? 0).ToString("N2")
+                                    </span>
+                                }
+                            </div>
+                            <div class="mt-2 text-muted" style="font-size: 0.7rem;">
+                                As of @(ind.LatestDate?.ToString("MMM yyyy") ?? "N/A")
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else if (econData != null && econData.HasError)
+    {
+        <div class="alert alert-light border shadow-sm mb-4 d-flex align-items-center gap-3">
+            <i class="bi bi-exclamation-triangle-fill text-warning fs-4"></i>
+            <div>
+                <h6 class="mb-1 fw-bold text-navy">Economic Data Unavailable</h6>
+                <p class="mb-0 text-muted small">@econData.ErrorMessage</p>
+            </div>
+        </div>
+    }
+
     <!-- Analytics Summary Cards -->
     <div class="row g-4 mb-4">
         <div class="col-md-4">
@@ -268,8 +332,8 @@
                             <th class="ps-4">Department</th>
                             <th>Budget Reference</th>
                             <th>Forecast Type</th>
-                            <th>Predicted ($)</th>
-                            <th>Actual ($)</th>
+                            <th>Predicted (₱)</th>
+                            <th>Actual (₱)</th>
                             <th>Variance</th>
                             <th>Year</th>
                             <th>Created By</th>
@@ -284,7 +348,15 @@
                             {
                                 var actualAmount = budgetAmounts.ContainsKey(item.BudgetID) ? budgetAmounts[item.BudgetID] : 0m;
                                 var variance = item.PredictedAmount - actualAmount;
-                                var varianceClass = variance > 0 ? "variance-positive" : variance < 0 ? "variance-negative" : "variance-zero";
+                                var varianceClass = "variance-zero";
+                                if (variance > 0)
+                                {
+                                    varianceClass = "variance-positive";
+                                }
+                                else if (variance < 0)
+                                {
+                                    varianceClass = "variance-negative";
+                                }
                                 var variancePrefix = variance > 0 ? "+" : "";
 
                                 <tr>
@@ -376,7 +448,7 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold text-secondary small">Predicted Amount ($)</label>
+                            <label class="form-label fw-semibold text-secondary small">Predicted Amount (₱)</label>
                             <input type="number" name="PredictedAmount" step="0.01" min="0" class="form-control shadow-sm border-0" placeholder="0.00" required />
                         </div>
                         <div class="col-md-6 mb-3">
@@ -414,7 +486,7 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold text-secondary small">Predicted Amount ($)</label>
+                            <label class="form-label fw-semibold text-secondary small">Predicted Amount (₱)</label>
                             <input type="number" name="PredictedAmount" id="editAmount" step="0.01" min="0" class="form-control shadow-sm border-0" required />
                         </div>
                         <div class="col-md-6 mb-3">
@@ -484,7 +556,7 @@
                         padding: 12,
                         cornerRadius: 10,
                         callbacks: {
-                            label: function(ctx) { return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString(); }
+                            label: function(ctx) { return ctx.dataset.label + ': ₱' + ctx.parsed.y.toLocaleString(); }
                         }
                     }
                 },
@@ -494,7 +566,7 @@
                         grid: { color: 'rgba(0,0,0,0.04)' },
                         ticks: {
                             color: '#6B7280', font: { size: 11 },
-                            callback: function(v) { return '$' + v.toLocaleString(); }
+                            callback: function(v) { return '₱' + v.toLocaleString(); }
                         }
                     }
                 }
@@ -554,7 +626,7 @@
                         padding: 12,
                         cornerRadius: 10,
                         callbacks: {
-                            label: function(ctx) { return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString(); }
+                            label: function(ctx) { return ctx.dataset.label + ': ₱' + ctx.parsed.y.toLocaleString(); }
                         }
                     }
                 },
@@ -564,7 +636,7 @@
                         grid: { color: 'rgba(0,0,0,0.04)' },
                         ticks: {
                             color: '#6B7280', font: { size: 11 },
-                            callback: function(v) { return '$' + v.toLocaleString(); }
+                            callback: function(v) { return '₱' + v.toLocaleString(); }
                         }
                     }
                 }

@@ -1,0 +1,130 @@
+@{
+    Layout = "~/Views/Shared/_IdentityLayout.cshtml";
+    ViewData["Title"] = "Subscription Required";
+
+    var plan = Context.Session.GetString("SubscriptionPlan") ?? "Basic";
+    var companyName = Context.Session.GetString("CompanyName") ?? "Your Company";
+
+    // Plan display info
+    var planPrice = plan switch
+    {
+        "Premium" => "$79",
+        "Enterprise" => "$299",
+        _ => "$29"
+    };
+    var planFeatures = plan switch
+    {
+        "Premium" => new[] { "1 Admin + 15 Users", "Advanced Financial Forecasting", "Unlimited Scenario Planning", "Simple Approval Workflows" },
+        "Enterprise" => new[] { "Unlimited Admin & Users", "Real-time Variance Analysis", "Advanced Multi-tier Approvals", "24/7 Dedicated Support" },
+        _ => new[] { "1 Admin + 3 Users", "Basic Budget Allocation", "Essential User Management" }
+    };
+}
+
+<style>
+    .plan-box {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid #eef0f3;
+        transition: all 0.3s ease;
+    }
+    .plan-box:hover {
+        border-color: #05828e;
+        box-shadow: 0 5px 15px rgba(5,130,142,0.1);
+    }
+    .btn-checkout {
+        background: #05828e;
+        border: none;
+        padding: 16px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(5,130,142,0.3);
+        transition: all 0.3s ease;
+    }
+    .btn-checkout:hover {
+        background: #046b75;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(5,130,142,0.4);
+    }
+    .feature-list {
+        padding-left: 0;
+        margin-bottom: 2rem;
+    }
+    .feature-list li {
+        margin-bottom: 12px;
+        color: #495057;
+        display: flex;
+        align-items: center;
+    }
+    .feature-icon {
+        color: #05828e;
+        background: rgba(5,130,142,0.1);
+        padding: 4px;
+        border-radius: 50%;
+        font-size: 0.8rem;
+        margin-right: 12px;
+    }
+</style>
+
+<div class="w-100" style="max-width: 450px; margin: 0 auto;">
+    
+    <!-- Header Area -->
+    <div class="text-center mb-4">
+        <div class="d-inline-flex justify-content-center align-items-center mb-3" style="width: 70px; height: 70px; border-radius: 50%; background: rgba(5, 130, 142, 0.1);">
+            <i class="bi bi-rocket-takeoff-fill" style="font-size: 2rem; color: #05828e;"></i>
+        </div>
+        <h2 class="auth-title">Activate Account</h2>
+        <p class="auth-subtitle">Welcome, @companyName! Please complete your subscription to unlock FinSight.</p>
+    </div>
+
+    <!-- Alert -->
+    <div class="alert d-flex align-items-center p-3 mb-4 border-0" role="alert" style="border-radius: 10px; background: #fff8e6; color: #997404;">
+        <i class="bi bi-shield-lock-fill me-3 fs-4"></i>
+        <div>
+            <strong class="d-block">Account Inactive</strong>
+            <span class="small">Payment required to access the ERP.</span>
+        </div>
+    </div>
+
+    <!-- Selected Plan Summary -->
+    <div class="plan-box mb-4 d-flex justify-content-between align-items-center">
+        <div>
+            <span class="text-uppercase text-muted fw-bold d-block" style="font-size: 0.75rem; letter-spacing: 1px;">Selected Plan</span>
+            <span class="fw-bold fs-5 text-dark mt-1">@plan Plan</span>
+        </div>
+        <div class="text-end">
+            <span class="fw-bold fs-3" style="color: #05828e;">@planPrice</span>
+            <span class="text-muted small">/mo</span>
+        </div>
+    </div>
+
+    <!-- Features -->
+    <ul class="list-unstyled feature-list">
+        @foreach (var feature in planFeatures)
+        {
+            <li>
+                <i class="bi bi-check feature-icon"></i>
+                <span class="fw-medium">@feature</span>
+            </li>
+        }
+    </ul>
+
+    <!-- Checkout Button -->
+    <a href="@Url.Action("Checkout", "Subscription")" class="btn btn-checkout text-white w-100 mb-3 d-flex justify-content-center align-items-center">
+        <span>Proceed to Secure Checkout</span>
+        <i class="bi bi-arrow-right ms-2"></i>
+    </a>
+
+    <!-- Secure Notice & Logout -->
+    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+        <small class="text-muted d-flex align-items-center">
+            <i class="bi bi-lock-fill me-1"></i>
+            Secured by Stripe
+        </small>
+        <a href="@Url.Action("Logout", "Auth")" class="text-muted small fw-bold text-decoration-none hover-primary">
+            Log out instead
+        </a>
+    </div>
+
+</div>

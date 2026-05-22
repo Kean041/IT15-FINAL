@@ -1,0 +1,332 @@
+@model FinSight.Models.ViewModels.AuditLogViewModel
+@{
+    Layout = "_SuperAdminLayout";
+    ViewData["Title"] = "Security Logs";
+}
+
+<style>
+:root {
+    --tq: #05828e; --tq-dark: #047078; --tq-light: rgba(5,130,142,0.08);
+    --tq-glow: rgba(5,130,142,0.18); --navy: #162229;
+    --danger: #E26D5C; --success: #10b981; --warning: #f59e0b;
+}
+.bg-offwhite { background-color: #e7eaef; }
+.text-turquoise { color: var(--tq) !important; }
+.text-navy { color: var(--navy) !important; }
+
+.analytics-card {
+    background: #fff; border-radius: 16px; border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03); padding: 20px;
+    height: 100%; border-left: 5px solid var(--tq); transition: box-shadow 0.2s;
+}
+.analytics-card:hover { box-shadow: 0 8px 24px var(--tq-glow); }
+.analytics-card-navy    { border-left-color: var(--navy); }
+.analytics-card-warning { border-left-color: var(--warning); }
+.analytics-card-danger  { border-left-color: var(--danger); }
+
+.card-dash {
+    background: #fff; border-radius: 16px; border: 1px solid rgba(0,0,0,0.06);
+    transition: box-shadow 0.2s;
+}
+.card-dash:hover { box-shadow: 0 8px 24px var(--tq-glow); }
+
+/* Filter bar */
+.filter-bar .form-select, .filter-bar .form-control {
+    border-radius: 10px; border: 1.5px solid rgba(155,168,184,0.3);
+    font-size: 0.85rem; padding: 8px 12px;
+}
+.filter-bar .form-select:focus, .filter-bar .form-control:focus {
+    border-color: var(--tq); box-shadow: 0 0 0 3px var(--tq-light);
+}
+.btn-tq {
+    background: var(--tq); color: #fff; border: none; border-radius: 10px;
+    font-weight: 500; padding: 8px 20px; font-size: 0.85rem;
+}
+.btn-tq:hover { background: var(--tq-dark); color: #fff; }
+.btn-outline-tq {
+    background: transparent; color: var(--tq); border: 1.5px solid var(--tq);
+    border-radius: 10px; font-weight: 500; padding: 8px 20px; font-size: 0.85rem;
+}
+.btn-outline-tq:hover { background: var(--tq); color: #fff; }
+
+/* Table */
+.table-mini thead th {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--navy); font-weight: 700; padding: 10px 12px;
+    border-bottom: 2px solid rgba(155,168,184,0.3) !important;
+}
+.table-mini tbody td {
+    padding: 10px 12px; font-size: 13px; vertical-align: middle;
+    border-bottom: 1px solid rgba(155,168,184,0.15);
+}
+.table-mini tbody tr { cursor: pointer; transition: background 0.15s; }
+.table-mini tbody tr:hover { background: rgba(5,130,142,0.03); }
+
+/* Badges */
+.badge-info     { background: #d1fae5; color: #065f46; border-radius: 20px; padding: 4px 10px; font-size: 11px; font-weight: 600; }
+.badge-warn     { background: #fef3c7; color: #92400e; border-radius: 20px; padding: 4px 10px; font-size: 11px; font-weight: 600; }
+.badge-critical { background: #fee2e2; color: #991b1b; border-radius: 20px; padding: 4px 10px; font-size: 11px; font-weight: 600; }
+
+/* Pagination */
+.page-link { border-radius: 8px !important; margin: 0 2px; border: none; color: var(--navy); font-size: 0.85rem; }
+.page-link:hover { background: var(--tq-light); color: var(--tq); }
+.page-item.active .page-link { background: var(--tq); color: #fff; border-color: var(--tq); }
+.page-item.disabled .page-link { color: #ccc; }
+
+/* Detail modal */
+.detail-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #9ba8b8; font-weight: 700; margin-bottom: 2px; }
+.detail-value { font-size: 14px; color: var(--navy); font-weight: 500; margin-bottom: 14px; }
+</style>
+
+<div class="container-fluid px-0">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-navy mb-0">Security Logs</h2>
+            <p class="text-muted mb-0">Security-related activities and audit trail across all tenants.</p>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="analytics-card">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size:0.7rem;">Total Logs</h6>
+                        <h3 class="fw-bold text-navy mb-0">@Model.TotalLogs</h3>
+                    </div>
+                    <div class="bg-offwhite rounded-circle d-flex align-items-center justify-content-center" style="width:46px;height:46px;">
+                        <i class="bi bi-shield-lock fs-5 text-turquoise"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-navy">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size:0.7rem;">Info Events</h6>
+                        <h3 class="fw-bold text-navy mb-0">@Model.SystemLogs</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background:#d1fae5;width:46px;height:46px;">
+                        <i class="bi bi-info-circle fs-5" style="color:#065f46;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-warning">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size:0.7rem;">Warnings</h6>
+                        <h3 class="fw-bold mb-0" style="color:var(--warning);">@Model.SecurityLogs</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background:#fef3c7;width:46px;height:46px;">
+                        <i class="bi bi-exclamation-triangle fs-5" style="color:#92400e;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="analytics-card analytics-card-danger">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1 fw-bold text-uppercase" style="font-size:0.7rem;">Critical Events</h6>
+                        <h3 class="fw-bold mb-0" style="color:var(--danger);">@Model.CriticalLogs</h3>
+                    </div>
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="background:#fee2e2;width:46px;height:46px;">
+                        <i class="bi bi-exclamation-octagon fs-5" style="color:#991b1b;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="card-dash p-3 mb-4">
+        <form method="get" asp-action="SecurityLogs" class="filter-bar">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label text-muted small fw-semibold mb-1">Severity</label>
+                    <select name="severity" class="form-select">
+                        <option value="">All Levels</option>
+                        <option value="Info" selected="@(Model.SeverityFilter == "Info")">Info</option>
+                        <option value="Warning" selected="@(Model.SeverityFilter == "Warning")">Warning</option>
+                        <option value="Critical" selected="@(Model.SeverityFilter == "Critical")">Critical</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label text-muted small fw-semibold mb-1">From</label>
+                    <input type="date" name="startDate" class="form-control" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label text-muted small fw-semibold mb-1">To</label>
+                    <input type="date" name="endDate" class="form-control" value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small fw-semibold mb-1">Search</label>
+                    <input type="text" name="search" class="form-control" placeholder="Action, details, user, tenant..." value="@Model.SearchQuery" />
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-tq flex-fill"><i class="bi bi-funnel me-1"></i>Filter</button>
+                    <a asp-action="SecurityLogs" class="btn btn-outline-tq"><i class="bi bi-x-lg"></i></a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="card-dash p-4">
+        <div class="table-responsive">
+            <table class="table table-mini mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Date & Time</th>
+                        <th>Severity</th>
+                        <th>Action</th>
+                        <th>User</th>
+                        <th>IP Address</th>
+                        <th>Tenant</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in Model.Logs)
+                    {
+                        var sevCls = log.Severity switch { "Warning" => "badge-warn", "Critical" => "badge-critical", _ => "badge-info" };
+                        <tr onclick="showLogDetail(@log.AuditLogID)">
+                            <td class="text-muted">@log.AuditLogID</td>
+                            <td class="text-muted" style="white-space:nowrap;">@log.CreatedAt.ToString("MMM dd, yyyy HH:mm")</td>
+                            <td><span class="badge @sevCls">@log.Severity</span></td>
+                            <td class="fw-semibold text-navy">@log.Action</td>
+                            <td>@log.UserName</td>
+                            <td class="text-muted" style="font-size:12px;">@(log.IPAddress ?? "—")</td>
+                            <td class="text-muted">@log.CompanyName</td>
+                            <td>
+                                <button class="btn btn-sm border-0" style="color:var(--tq);" onclick="event.stopPropagation(); showLogDetail(@log.AuditLogID);">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Logs.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <i class="bi bi-shield-x" style="font-size:2.5rem; color:#ccc;"></i>
+                                <p class="text-muted mt-2 mb-0">No security logs found.</p>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        @if (Model.TotalPages > 1)
+        {
+            <nav class="mt-3 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Page @Model.CurrentPage of @Model.TotalPages</span>
+                <ul class="pagination mb-0">
+                    <li class="page-item @(Model.CurrentPage == 1 ? "disabled" : "")">
+                        <a class="page-link" asp-action="SecurityLogs"
+                           asp-route-severity="@Model.SeverityFilter" asp-route-search="@Model.SearchQuery" 
+                           asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")" asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")" 
+                           asp-route-page="@(Model.CurrentPage - 1)">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    @for (int i = Math.Max(1, Model.CurrentPage - 2); i <= Math.Min(Model.TotalPages, Model.CurrentPage + 2); i++)
+                    {
+                        <li class="page-item @(i == Model.CurrentPage ? "active" : "")">
+                            <a class="page-link" asp-action="SecurityLogs"
+                               asp-route-severity="@Model.SeverityFilter" asp-route-search="@Model.SearchQuery" 
+                               asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")" asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")" 
+                               asp-route-page="@i">@i</a>
+                        </li>
+                    }
+                    <li class="page-item @(Model.CurrentPage == Model.TotalPages ? "disabled" : "")">
+                        <a class="page-link" asp-action="SecurityLogs"
+                           asp-route-severity="@Model.SeverityFilter" asp-route-search="@Model.SearchQuery" 
+                           asp-route-startDate="@Model.StartDate?.ToString("yyyy-MM-dd")" asp-route-endDate="@Model.EndDate?.ToString("yyyy-MM-dd")" 
+                           asp-route-page="@(Model.CurrentPage + 1)">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        }
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal fade" id="logDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px; border:none;">
+            <div class="modal-header border-0 pb-0" style="padding:24px 24px 12px;">
+                <h5 class="modal-title fw-bold text-navy"><i class="bi bi-info-circle me-2 text-turquoise"></i>Security Log Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding:12px 24px 24px;" id="logDetailBody">
+                <div class="text-center py-4"><div class="spinner-border text-muted" role="status"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function showLogDetail(id) {
+        const modal = new bootstrap.Modal(document.getElementById('logDetailModal'));
+        const body = document.getElementById('logDetailBody');
+        body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-muted" role="status"></div></div>';
+        modal.show();
+
+        fetch('@Url.Action("GetLogDetails", "SuperAdmin")' + '?id=' + id)
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) { body.innerHTML = '<p class="text-danger">Log not found.</p>'; return; }
+                const d = res.data;
+                const sevCls = d.severity === 'Critical' ? 'badge-critical' : d.severity === 'Warning' ? 'badge-warn' : 'badge-info';
+                body.innerHTML = `
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="detail-label">Log ID</div>
+                            <div class="detail-value">#${d.auditLogID}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">Date & Time</div>
+                            <div class="detail-value">${new Date(d.createdAt).toLocaleString()}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">Severity</div>
+                            <div class="detail-value"><span class="badge ${sevCls}">${d.severity}</span></div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">Tenant</div>
+                            <div class="detail-value">${d.companyName}</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="detail-label">Action</div>
+                            <div class="detail-value fw-bold">${d.action}</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="detail-label">Details</div>
+                            <div class="detail-value" style="background:#f8f9fa; padding:10px 14px; border-radius:10px; font-size:13px;">${d.details || '—'}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">User</div>
+                            <div class="detail-value">${d.userName} <br/><span class="text-muted" style="font-size:12px;">(${d.userEmail})</span></div>
+                        </div>
+                        <div class="col-6">
+                            <div class="detail-label">IP Address</div>
+                            <div class="detail-value">${d.ipAddress || '—'}</div>
+                        </div>
+                    </div>`;
+            })
+            .catch(() => { body.innerHTML = '<p class="text-danger">Failed to load details.</p>'; });
+    }
+</script>
+}

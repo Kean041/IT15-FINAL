@@ -237,7 +237,7 @@
                             <th class="ps-4">Scenario Name</th>
                             <th>Description</th>
                             <th>Details</th>
-                            <th>Total Adjusted ($)</th>
+                            <th>Total Adjusted (₱)</th>
                             <th>Created By</th>
                             <th>Created At</th>
                             <th class="text-end pe-4">Actions</th>
@@ -483,7 +483,7 @@
                 <select name="BudgetIDs" class="form-select border-0 shadow-sm" required>${options}</select>
             </div>
             <div style="min-width:180px;">
-                <label class="form-label small fw-semibold" style="color:var(--muted);">Adjusted Amount ($)</label>
+                <label class="form-label small fw-semibold" style="color:var(--muted);">Adjusted Amount (₱)</label>
                 <input type="number" name="AdjustedAmounts" step="0.01" min="0.01"
                        class="form-control border-0 shadow-sm" placeholder="0.00"
                        value="${adjustedAmount ?? ''}" required />
@@ -572,7 +572,7 @@
                         padding: 12,
                         cornerRadius: 10,
                         callbacks: {
-                            label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString()
+                            label: ctx => ctx.dataset.label + ': ₱' + ctx.parsed.y.toLocaleString()
                         }
                     }
                 },
@@ -581,7 +581,7 @@
                          ticks: { color: '#9ba8b8', font: { size: 11 } } },
                     y: { grid: { color: 'rgba(155,168,184,0.12)' },
                          ticks: { color: '#9ba8b8', font: { size: 11 },
-                                  callback: v => '$' + v.toLocaleString() } }
+                                  callback: v => '₱' + v.toLocaleString() } }
                 }
             }
         });

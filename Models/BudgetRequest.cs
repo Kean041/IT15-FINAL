@@ -11,8 +11,18 @@ namespace FinSight.Models
         public int RequestID { get; set; }
 
         [Required]
+        [StringLength(255)]
+        public string Title { get; set; } = "Budget Request";
+
+        [StringLength(1000)]
+        public string? Description { get; set; }
+
+        [Required]
         [Column(TypeName = "decimal(18,2)")]
         public decimal RequestedAmount { get; set; }
+
+        [Required]
+        public DateTime DateNeeded { get; set; } = DateTime.Now;
 
         [Required]
         public int DepartmentID { get; set; }

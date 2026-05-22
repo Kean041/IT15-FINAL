@@ -25,8 +25,9 @@ namespace FinSight.Controllers
         // GET: Variance/Analysis
         public async Task<IActionResult> Analysis(string searchString, string periodFilter, int? yearFilter, int? departmentFilter, int page = 1)
         {
-            // RBAC: All authenticated roles can view variance analysis
+            // RBAC: Only Finance Manager, Admin, SuperAdmin can access analysis
             if (!IsAuthenticated) return RedirectToLogin();
+            if (!CanAccessAnalysis) return AccessDenied();
 
             int? tenantFilter = GetTenantFilter();
             int pageSize = 10;

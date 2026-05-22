@@ -1,0 +1,23 @@
+root = true
+
+[*.cs]
+# This project uses manual validation and session-based MVC flow in several actions.
+dotnet_diagnostic.S6967.severity = none
+
+# Stripe webhook signature verification and Turnstile verification require raw request/form access.
+dotnet_diagnostic.S6932.severity = none
+
+# Existing database fields use local DateTime values; changing persistence semantics is out of scope.
+dotnet_diagnostic.S6561.severity = none
+dotnet_diagnostic.S6562.severity = none
+dotnet_diagnostic.S1066.severity = none
+
+# These helpers are instance methods for service API consistency and dependency-backed configuration.
+dotnet_diagnostic.S2325.severity = none
+
+# External provider URLs are stable protocol endpoints or configured elsewhere by provider contract.
+dotnet_diagnostic.S1075.severity = none
+
+[*.cshtml]
+# Razor view readability is preferred for these generated UI expressions.
+dotnet_diagnostic.S3358.severity = none

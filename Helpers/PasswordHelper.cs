@@ -1,25 +1,105 @@
+using System;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace FinSight.Helpers
 {
     /// <summary>
-    /// Shared password hashing utility.
-    /// Extracted from AuthController so multiple controllers can reuse the same logic.
+    /// Secure password hashing utility using PBKDF2 (HMAC-SHA256).
+    /// Supports dual-hash migration from legacy SHA256 hashes.
     /// </summary>
     public static class PasswordHelper
     {
+        // PBKDF2 configuration
+        private const int SaltSize = 16;       // 128-bit salt
+        private const int HashSize = 32;       // 256-bit hash
+        private const int Iterations = 100_000; // OWASP recommended minimum
+        private const string Prefix = "PBKDF2$"; // Marker to identify new hashes
+
         /// <summary>
-        /// Hashes a plain-text password using SHA256 and returns the hex string.
+        /// Hashes a plain-text password using PBKDF2 with a random salt.
+        /// Returns a prefixed string: "PBKDF2$iterations$salt$hash"
         /// </summary>
         public static string HashPassword(string password)
+        {
+            byte[] salt = RandomNumberGenerator.GetBytes(SaltSize);
+            byte[] hash = Rfc2898DeriveBytes.Pbkdf2(
+                Encoding.UTF8.GetBytes(password),
+                salt,
+                Iterations,
+                HashAlgorithmName.SHA256,
+                HashSize
+            );
+
+            return $"{Prefix}{Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
+        }
+
+        /// <summary>
+        /// Verifies a plain-text password against a stored hash.
+        /// Supports both new PBKDF2 hashes and legacy SHA256 hashes.
+        /// </summary>
+        public static bool VerifyPassword(string password, string storedHash)
+        {
+            if (string.IsNullOrEmpty(storedHash))
+                return false;
+
+            if (storedHash.StartsWith(Prefix))
+            {
+                return VerifyPbkdf2(password, storedHash);
+            }
+
+            // Legacy SHA256 fallback
+            return VerifyLegacySha256(password, storedHash);
+        }
+
+        /// <summary>
+        /// Returns true if the stored hash is a legacy SHA256 hash
+        /// that should be upgraded to PBKDF2 on next successful login.
+        /// </summary>
+        public static bool IsLegacyHash(string storedHash)
+        {
+            return !string.IsNullOrEmpty(storedHash) && !storedHash.StartsWith(Prefix);
+        }
+
+        // ── PBKDF2 verification ──
+        private static bool VerifyPbkdf2(string password, string storedHash)
+        {
+            try
+            {
+                // Format: "PBKDF2$iterations$salt$hash"
+                var parts = storedHash.Split('$');
+                if (parts.Length != 4) return false;
+
+                int iterations = int.Parse(parts[1]);
+                byte[] salt = Convert.FromBase64String(parts[2]);
+                byte[] expectedHash = Convert.FromBase64String(parts[3]);
+
+                byte[] actualHash = Rfc2898DeriveBytes.Pbkdf2(
+                    Encoding.UTF8.GetBytes(password),
+                    salt,
+                    iterations,
+                    HashAlgorithmName.SHA256,
+                    expectedHash.Length
+                );
+
+                return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // ── Legacy SHA256 verification (for migration) ──
+        private static bool VerifyLegacySha256(string password, string storedHash)
         {
             using var sha256 = SHA256.Create();
             var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
             var sb = new StringBuilder();
             foreach (var b in bytes)
                 sb.Append(b.ToString("x2"));
-            return sb.ToString();
+
+            return string.Equals(sb.ToString(), storedHash, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

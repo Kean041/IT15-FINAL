@@ -188,9 +188,11 @@
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
-                            <th class="ps-4">Department</th>
-                            <th>Amount ($)</th>
+                            <th class="ps-4">Title</th>
+                            <th>Department</th>
+                            <th>Amount (₱)</th>
                             <th>Budget</th>
+                            <th>Date Needed</th>
                             <th>Status</th>
                             <th>Submitted By</th>
                             <th>Approved By</th>
@@ -204,9 +206,11 @@
                             foreach (var item in Model)
                             {
                                 <tr>
-                                    <td class="ps-4 fw-semibold text-accent">@item.DepartmentName</td>
+                                    <td class="ps-4 fw-semibold text-accent">@item.Title</td>
+                                    <td>@item.DepartmentName</td>
                                     <td class="fw-bold">@item.RequestedAmount.ToString("N2")</td>
                                     <td>@item.BudgetCategory</td>
+                                    <td>@item.DateNeeded.ToString("MMM dd, yyyy")</td>
                                     <td>
                                         @if (item.Status == "Pending")
                                         {
@@ -230,13 +234,13 @@
                                     <td class="text-end pe-4">
                                         @if (item.Status == "Pending" && (bool)(ViewBag.CanApprove ?? false))
                                         {
-                                            <button class="btn btn-approve me-1" onclick="openReviewModal(@item.RequestID, '@item.DepartmentName', '@item.RequestedAmount', '@item.BudgetCategory', '@item.SubmittedByName', '@item.SubmittedDate.ToString("MMM dd, yyyy")')">
+                                            <button class="btn btn-approve me-1" onclick="openReviewModal(@item.RequestID, '@item.Title.Replace("'", "\\'")', '@(item.Description?.Replace("'", "\\'") ?? "")', '@item.DepartmentName', '@item.RequestedAmount', '@item.BudgetCategory', '@item.DateNeeded.ToString("MMM dd, yyyy")', '@item.SubmittedByName', '@item.SubmittedDate.ToString("MMM dd, yyyy")')">
                                                 <i class="bi bi-check2-circle"></i> Review
                                             </button>
                                         }
                                         else
                                         {
-                                            <button class="btn btn-view" onclick="openViewModal('@item.DepartmentName', '@item.RequestedAmount', '@item.BudgetCategory', '@item.SubmittedByName', '@item.SubmittedDate.ToString("MMM dd, yyyy")', '@item.Status', '@(item.ApprovedByName ?? "-")', '@(item.ApprovedDate?.ToString("MMM dd, yyyy") ?? "-")', '@(item.RejectionReason ?? "")')">
+                                            <button class="btn btn-view" onclick="openViewModal('@item.Title.Replace("'", "\\'")', '@(item.Description?.Replace("'", "\\'") ?? "")', '@item.DepartmentName', '@item.RequestedAmount', '@item.BudgetCategory', '@item.DateNeeded.ToString("MMM dd, yyyy")', '@item.SubmittedByName', '@item.SubmittedDate.ToString("MMM dd, yyyy")', '@item.Status', '@(item.ApprovedByName ?? "-")', '@(item.ApprovedDate?.ToString("MMM dd, yyyy") ?? "-")', '@(item.RejectionReason?.Replace("'", "\\'") ?? "")')">
                                                 <i class="bi bi-eye"></i> View
                                             </button>
                                         }
@@ -301,8 +305,22 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Requested Amount ($) <span class="text-danger">*</span></label>
-                        <input type="number" name="RequestedAmount" class="form-control" step="0.01" min="0.01" required placeholder="Enter amount" />
+                        <label class="form-label fw-semibold">Request Title <span class="text-danger">*</span></label>
+                        <input type="text" name="Title" class="form-control" required placeholder="e.g. Q4 Advertising" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Description</label>
+                        <textarea name="Description" class="form-control" rows="2" placeholder="Brief justification..."></textarea>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Requested Amount (₱) <span class="text-danger">*</span></label>
+                            <input type="number" name="RequestedAmount" class="form-control" step="0.01" min="0.01" required placeholder="Enter amount" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold">Date Needed <span class="text-danger">*</span></label>
+                            <input type="date" name="DateNeeded" class="form-control" required />
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer border-0 bg-white">
@@ -324,41 +342,78 @@
             </div>
             <div class="modal-body p-4" style="background:var(--bg);">
                 <div class="bg-white rounded-3 p-3 shadow-sm mb-3">
+                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Title</div><div class="col-7 fw-bold text-dark" id="rvTitle"></div></div>
+                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Description</div><div class="col-7 text-dark small" id="rvDesc"></div></div>
+                    <hr class="my-2" style="border-color:rgba(0,0,0,.05);" />
                     <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Department</div><div class="col-7 fw-bold text-dark" id="rvDept"></div></div>
                     <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Amount</div><div class="col-7 fw-bold text-accent" id="rvAmount"></div></div>
-                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Budget</div><div class="col-7 text-dark" id="rvBudget"></div></div>
+                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Budget Category</div><div class="col-7 text-dark" id="rvBudget"></div></div>
+                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Date Needed</div><div class="col-7 text-dark" id="rvDateNeeded"></div></div>
                     <hr class="my-2" style="border-color:rgba(0,0,0,.05);" />
                     <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Submitted By</div><div class="col-7 text-dark" id="rvSubmitter"></div></div>
                     <div class="row"><div class="col-5 text-muted small fw-semibold">Date</div><div class="col-7 text-dark" id="rvDate"></div></div>
                 </div>
 
-                <!-- Rejection Reason (shown when rejecting) -->
-                <div id="rejectionReasonBox" class="mb-3" style="display:none;">
-                    <label class="form-label fw-semibold text-danger">Rejection Reason</label>
-                    <textarea id="rejectionReasonInput" class="form-control" rows="3" placeholder="Provide reason for rejection..."></textarea>
-                </div>
-
+                <!-- Action Buttons -->
                 <div class="d-flex gap-2">
-                    <form id="approveForm" asp-action="ApproveRequest" method="post" class="flex-grow-1">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" id="rvApproveId" />
-                        <button type="submit" class="btn btn-approve w-100 py-2 fs-6" onclick="return confirm('Approve this request?')">
-                            <i class="bi bi-check-circle me-1"></i> Approve
-                        </button>
-                    </form>
-                    <button type="button" class="btn btn-reject flex-grow-1 py-2 fs-6" onclick="showRejectForm()">
+                    <button type="button" class="btn btn-approve flex-grow-1 py-2 fs-6 fw-semibold shadow-sm" onclick="openApproveModal()">
+                        <i class="bi bi-check-circle me-1"></i> Approve
+                    </button>
+                    <button type="button" class="btn btn-reject flex-grow-1 py-2 fs-6 fw-semibold shadow-sm" onclick="openRejectModal()">
                         <i class="bi bi-x-circle me-1"></i> Reject
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-                <form id="rejectForm" asp-action="RejectRequest" method="post" style="display:none;" class="mt-2">
+<!-- APPROVE CONFIRMATION MODAL -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-body p-4 text-center">
+                <i class="bi bi-question-circle text-success mb-3" style="font-size:3.5rem;"></i>
+                <h5 class="fw-bold text-dark mb-2">Confirm Approval</h5>
+                <p class="text-muted small mb-4">Are you sure you want to approve this budget request?</p>
+                <form id="approveForm" asp-action="ApproveRequest" method="post">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="id" id="rvRejectId" />
-                    <input type="hidden" name="rejectionReason" id="rvRejectReason" />
-                    <button type="submit" class="btn btn-reject w-100 py-2 fs-6" onclick="return confirmReject()">
-                        <i class="bi bi-x-circle me-1"></i> Confirm Rejection
-                    </button>
+                    <input type="hidden" name="id" id="approveModalId" />
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-light flex-grow-1 fw-medium" onclick="cancelApproveModal()">Cancel</button>
+                        <button type="submit" class="btn btn-approve flex-grow-1 fw-medium">
+                            <i class="bi bi-check-circle me-1"></i> Confirm Approve
+                        </button>
+                    </div>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- REJECT CONFIRMATION MODAL -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header bg-danger border-0">
+                <h5 class="modal-title fw-bold text-white"><i class="bi bi-x-circle me-2"></i>Reject Request</h5>
+                <button type="button" class="btn-close btn-close-white" onclick="cancelRejectModal()"></button>
+            </div>
+            <form id="rejectForm" asp-action="RejectRequest" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-body p-4 bg-white">
+                    <p class="text-dark small mb-3">You are about to reject this request. Please provide a valid reason.</p>
+                    <input type="hidden" name="id" id="rejectModalId" />
+                    <label class="form-label fw-semibold text-danger small">Rejection Reason <span class="text-danger">*</span></label>
+                    <textarea name="rejectionReason" id="rejectReasonInputModal" class="form-control mb-2 shadow-sm" rows="3" placeholder="Provide reason for rejection..." required></textarea>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-light fw-medium" onclick="cancelRejectModal()">Cancel</button>
+                    <button type="submit" class="btn btn-reject fw-medium px-4 shadow-sm">
+                        <i class="bi bi-x-circle me-1"></i> Confirm Reject
+                    </button>
+                </div>
+            </form>
             </div>
         </div>
     </div>
@@ -374,9 +429,13 @@
             </div>
             <div class="modal-body p-4" style="background:var(--bg);">
                 <div class="bg-white rounded-3 p-3 shadow-sm">
+                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Title</div><div class="col-7 fw-bold text-dark" id="vmTitle"></div></div>
+                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Description</div><div class="col-7 text-dark small" id="vmDesc"></div></div>
+                    <hr class="my-2" style="border-color:rgba(0,0,0,.05);" />
                     <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Department</div><div class="col-7 fw-bold text-dark" id="vmDept"></div></div>
                     <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Amount</div><div class="col-7 fw-bold text-accent" id="vmAmount"></div></div>
-                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Budget</div><div class="col-7 text-dark" id="vmBudget"></div></div>
+                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Budget Category</div><div class="col-7 text-dark" id="vmBudget"></div></div>
+                    <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Date Needed</div><div class="col-7 text-dark" id="vmDateNeeded"></div></div>
                     <hr class="my-2" style="border-color:rgba(0,0,0,.05);" />
                     <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Status</div><div class="col-7" id="vmStatus"></div></div>
                     <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Submitted By</div><div class="col-7 text-dark" id="vmSubmitter"></div></div>
@@ -391,34 +450,61 @@
 </div>
 
 <script>
-    function openReviewModal(id, dept, amount, budget, submitter, date) {
-        document.getElementById('rvApproveId').value = id;
-        document.getElementById('rvRejectId').value = id;
+    var reviewModalInstance;
+    var approveModalInstance;
+    var rejectModalInstance;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        reviewModalInstance = new bootstrap.Modal(document.getElementById('reviewModal'));
+        approveModalInstance = new bootstrap.Modal(document.getElementById('approveModal'));
+        rejectModalInstance = new bootstrap.Modal(document.getElementById('rejectModal'));
+    });
+
+    function openReviewModal(id, title, desc, dept, amount, budget, dateNeeded, submitter, date) {
+        // Store the ID globally for the modals
+        document.getElementById('approveModalId').value = id;
+        document.getElementById('rejectModalId').value = id;
+        
+        document.getElementById('rvTitle').innerText = title;
+        document.getElementById('rvDesc').innerText = desc;
         document.getElementById('rvDept').innerText = dept;
-        document.getElementById('rvAmount').innerText = '$' + parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits:2});
+        document.getElementById('rvAmount').innerText = '₱' + parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits:2});
         document.getElementById('rvBudget').innerText = budget;
+        document.getElementById('rvDateNeeded').innerText = dateNeeded;
         document.getElementById('rvSubmitter').innerText = submitter;
         document.getElementById('rvDate').innerText = date;
-        document.getElementById('rejectionReasonBox').style.display = 'none';
-        document.getElementById('rejectForm').style.display = 'none';
-        new bootstrap.Modal(document.getElementById('reviewModal')).show();
+        
+        reviewModalInstance.show();
     }
 
-    function showRejectForm() {
-        document.getElementById('rejectionReasonBox').style.display = 'block';
-        document.getElementById('rejectForm').style.display = 'block';
+    function openApproveModal() {
+        reviewModalInstance.hide();
+        approveModalInstance.show();
     }
 
-    function confirmReject() {
-        var reason = document.getElementById('rejectionReasonInput').value;
-        document.getElementById('rvRejectReason').value = reason;
-        return confirm('Are you sure you want to reject this request?');
+    function cancelApproveModal() {
+        approveModalInstance.hide();
+        reviewModalInstance.show();
     }
 
-    function openViewModal(dept, amount, budget, submitter, date, status, approver, approvalDate, reason) {
+    function openRejectModal() {
+        document.getElementById('rejectReasonInputModal').value = '';
+        reviewModalInstance.hide();
+        rejectModalInstance.show();
+    }
+
+    function cancelRejectModal() {
+        rejectModalInstance.hide();
+        reviewModalInstance.show();
+    }
+
+    function openViewModal(title, desc, dept, amount, budget, dateNeeded, submitter, date, status, approver, approvalDate, reason) {
+        document.getElementById('vmTitle').innerText = title;
+        document.getElementById('vmDesc').innerText = desc;
         document.getElementById('vmDept').innerText = dept;
-        document.getElementById('vmAmount').innerText = '$' + parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits:2});
+        document.getElementById('vmAmount').innerText = '₱' + parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits:2});
         document.getElementById('vmBudget').innerText = budget;
+        document.getElementById('vmDateNeeded').innerText = dateNeeded;
         document.getElementById('vmSubmitter').innerText = submitter;
         document.getElementById('vmDate').innerText = date;
         document.getElementById('vmStatus').innerHTML = status === 'Approved' ? '<span class="badge badge-approved">Approved</span>' : '<span class="badge badge-rejected">Rejected</span>';

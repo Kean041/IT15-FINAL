@@ -14,6 +14,9 @@ namespace FinSight.Models.ViewModels
         public decimal RequestedAmount { get; set; }
         public string BudgetCategory { get; set; } = string.Empty;
         public int BudgetID { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public DateTime DateNeeded { get; set; }
         public string Status { get; set; } = string.Empty;
 
         // Submitter info

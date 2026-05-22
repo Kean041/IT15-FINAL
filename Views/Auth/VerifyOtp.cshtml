@@ -1,0 +1,447 @@
+@model FinSight.Models.ViewModels.VerifyOtpViewModel
+@{
+    Layout = "~/Views/Shared/_IdentityLayout.cshtml";
+    ViewData["Title"] = "Verify Your Identity";
+}
+
+@section Styles {
+    <style>
+        /* ── OTP Verification Styles ── */
+        .otp-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(5,130,142,0.12), rgba(5,130,142,0.06));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        .otp-icon i {
+            font-size: 2rem;
+            color: var(--primary);
+        }
+
+        @@keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(5,130,142,0.15); }
+            50% { box-shadow: 0 0 0 12px rgba(5,130,142,0); }
+        }
+
+        .otp-email-badge {
+            background: var(--primary-light);
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 0.5rem 1.25rem;
+            border-radius: 50px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* OTP Input */
+        .otp-input-group {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .otp-input {
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 12px;
+            padding: 1rem 1.5rem;
+            border: 2px solid rgba(155,168,184,0.4);
+            border-radius: var(--radius-input);
+            width: 100%;
+            color: var(--text-heading);
+            background: var(--input-bg);
+            transition: all 0.3s ease;
+            font-family: 'Inter', monospace;
+        }
+
+        .otp-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-glow);
+            outline: none;
+        }
+
+        .otp-input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.5;
+            letter-spacing: 8px;
+            font-size: 1.4rem;
+        }
+
+        /* Countdown Timer */
+        .countdown-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border-radius: var(--radius-input);
+            background: rgba(5,130,142,0.04);
+            border: 1px solid rgba(5,130,142,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .countdown-container.expired {
+            background: rgba(211,47,47,0.04);
+            border-color: rgba(211,47,47,0.15);
+        }
+
+        .timer-ring {
+            position: relative;
+            width: 44px;
+            height: 44px;
+            flex-shrink: 0;
+        }
+
+        .timer-ring svg {
+            width: 44px;
+            height: 44px;
+            transform: rotate(-90deg);
+        }
+
+        .timer-ring .ring-bg {
+            fill: none;
+            stroke: rgba(155,168,184,0.2);
+            stroke-width: 3;
+        }
+
+        .timer-ring .ring-progress {
+            fill: none;
+            stroke: var(--primary);
+            stroke-width: 3;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
+        }
+
+        .timer-ring .ring-progress.expired {
+            stroke: #d32f2f;
+        }
+
+        .timer-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .timer-text.expired {
+            color: #d32f2f;
+        }
+
+        .countdown-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .countdown-label strong {
+            color: var(--text-heading);
+        }
+
+        /* Resend Section */
+        .resend-section {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(155,168,184,0.2);
+        }
+
+        .resend-section p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .btn-resend {
+            background: transparent;
+            border: 1.5px solid var(--primary);
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 0.6rem 1.5rem;
+            border-radius: var(--radius-btn);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-resend:hover:not(:disabled) {
+            background: var(--primary);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        .btn-resend:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: var(--text-muted);
+            color: var(--text-muted);
+        }
+
+        .resend-cooldown {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        /* Back to Login */
+        .back-to-login {
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+
+        .back-to-login a {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: color 0.2s;
+        }
+
+        .back-to-login a:hover {
+            color: var(--primary);
+        }
+
+        /* Success animation */
+        .alert-success {
+            background: rgba(5,130,142,0.08);
+            border: 1px solid rgba(5,130,142,0.2);
+            color: var(--primary);
+            border-radius: var(--radius-input);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .alert-danger {
+            background: rgba(211,47,47,0.06);
+            border: 1px solid rgba(211,47,47,0.15);
+            color: #c62828;
+            border-radius: var(--radius-input);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .alert-warning {
+            background: rgba(255,152,0,0.06);
+            border: 1px solid rgba(255,152,0,0.15);
+            color: #e65100;
+            border-radius: var(--radius-input);
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @@keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+}
+
+<div class="text-center">
+    <!-- Shield Icon -->
+    <div class="otp-icon">
+        <i class="bi bi-shield-lock"></i>
+    </div>
+
+    <div class="auth-title">Verify Your Identity</div>
+    <div class="auth-subtitle">Enter the 6-digit code sent to your email</div>
+
+    <!-- Masked Email Badge -->
+    @if (!string.IsNullOrEmpty(Model.MaskedEmail))
+    {
+        <div>
+            <span class="otp-email-badge">
+                <i class="bi bi-envelope-check"></i>
+                @Model.MaskedEmail
+            </span>
+        </div>
+    }
+</div>
+
+<!-- Success Message -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success py-2 small mb-3" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i>@TempData["SuccessMessage"]
+    </div>
+}
+
+<!-- Warning Message -->
+@if (TempData["Warning"] != null)
+{
+    <div class="alert alert-warning py-2 small mb-3" role="alert">
+        <i class="bi bi-exclamation-circle-fill me-2"></i>@TempData["Warning"]
+    </div>
+}
+
+<!-- Error Message -->
+@if (!string.IsNullOrEmpty(ViewBag.Error))
+{
+    <div class="alert alert-danger py-2 small mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>@ViewBag.Error
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger py-2 small mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>@TempData["Error"]
+    </div>
+}
+
+<!-- OTP Form -->
+<form asp-action="VerifyOtp" asp-controller="Auth" method="post" id="otpForm">
+    @Html.AntiForgeryToken()
+
+    <!-- OTP Input -->
+    <div class="otp-input-group">
+        <input asp-for="OTPCode"
+               class="otp-input"
+               placeholder="000000"
+               maxlength="6"
+               inputmode="numeric"
+               pattern="[0-9]*"
+               autocomplete="one-time-code"
+               autofocus
+               id="otpInput" />
+        <span asp-validation-for="OTPCode" class="field-validation-error text-center d-block mt-2"></span>
+    </div>
+
+    <!-- Countdown Timer -->
+    <div class="countdown-container" id="countdownContainer">
+        <div class="timer-ring">
+            <svg viewBox="0 0 44 44">
+                <circle class="ring-bg" cx="22" cy="22" r="18" />
+                <circle class="ring-progress" id="ringProgress" cx="22" cy="22" r="18"
+                        stroke-dasharray="113.1"
+                        stroke-dashoffset="0" />
+            </svg>
+            <span class="timer-text" id="timerText">--</span>
+        </div>
+        <div class="countdown-label">
+            <span id="countdownMessage">Code expires in <strong id="countdownTime">--:--</strong></span>
+        </div>
+    </div>
+
+    <!-- Verify Button -->
+    <button type="submit" class="btn btn-primary w-100 py-2 mb-2" id="verifyBtn">
+        <i class="bi bi-shield-check me-2"></i>Verify Code
+    </button>
+</form>
+
+<!-- Resend Section -->
+<div class="resend-section">
+    <p>Didn't receive the code?</p>
+    <form asp-action="ResendOtp" asp-controller="Auth" method="post" style="display: inline;">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn-resend" id="resendBtn"
+                @(Model.CanResend ? "" : "disabled")>
+            <i class="bi bi-arrow-clockwise"></i>
+            Resend Code
+        </button>
+    </form>
+    <div class="resend-cooldown" id="resendCooldown" style="@(Model.CanResend ? "display:none;" : "")">
+        Resend available in <strong id="resendTimer">@Model.ResendCooldownSeconds</strong>s
+    </div>
+</div>
+
+<!-- Back to Login -->
+<div class="back-to-login">
+    <a asp-action="Login" asp-controller="Auth">
+        <i class="bi bi-arrow-left"></i> Back to Login
+    </a>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            // ── OTP Input: auto-focus, numeric only ──
+            const otpInput = document.getElementById('otpInput');
+            otpInput.addEventListener('input', function (e) {
+                this.value = this.value.replace(/[^0-9]/g, '');
+                if (this.value.length === 6) {
+                    document.getElementById('verifyBtn').focus();
+                }
+            });
+
+            // ── Countdown Timer ──
+            let remaining = @Model.RemainingSeconds;
+            const totalSeconds = @(ViewBag.TotalSeconds ?? 300); // 5 minutes default
+            const circumference = 2 * Math.PI * 18; // r=18
+
+            const ringProgress = document.getElementById('ringProgress');
+            const timerText = document.getElementById('timerText');
+            const countdownTime = document.getElementById('countdownTime');
+            const countdownContainer = document.getElementById('countdownContainer');
+            const countdownMessage = document.getElementById('countdownMessage');
+            const verifyBtn = document.getElementById('verifyBtn');
+
+            ringProgress.style.strokeDasharray = circumference;
+
+            function updateCountdown() {
+                if (remaining <= 0) {
+                    timerText.textContent = '0';
+                    timerText.classList.add('expired');
+                    countdownTime.textContent = '0:00';
+                    countdownContainer.classList.add('expired');
+                    ringProgress.classList.add('expired');
+                    ringProgress.style.strokeDashoffset = circumference;
+                    countdownMessage.innerHTML = '<strong style="color:#d32f2f;">Code has expired.</strong> Please request a new one.';
+                    verifyBtn.disabled = true;
+                    verifyBtn.innerHTML = '<i class="bi bi-x-circle me-2"></i>Code Expired';
+                    return;
+                }
+
+                const minutes = Math.floor(remaining / 60);
+                const seconds = remaining % 60;
+                const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                timerText.textContent = remaining <= 60 ? remaining + 's' : minutes + 'm';
+                countdownTime.textContent = timeStr;
+
+                const progress = ((totalSeconds - remaining) / totalSeconds) * circumference;
+                ringProgress.style.strokeDashoffset = progress;
+
+                remaining--;
+                setTimeout(updateCountdown, 1000);
+            }
+
+            updateCountdown();
+
+            // ── Resend Cooldown Timer ──
+            let resendRemaining = @Model.ResendCooldownSeconds;
+            const resendBtn = document.getElementById('resendBtn');
+            const resendCooldown = document.getElementById('resendCooldown');
+            const resendTimer = document.getElementById('resendTimer');
+
+            function updateResendCooldown() {
+                if (resendRemaining <= 0) {
+                    resendBtn.disabled = false;
+                    resendCooldown.style.display = 'none';
+                    return;
+                }
+
+                resendBtn.disabled = true;
+                resendCooldown.style.display = '';
+                resendTimer.textContent = resendRemaining;
+                resendRemaining--;
+                setTimeout(updateResendCooldown, 1000);
+            }
+
+            if (resendRemaining > 0) {
+                updateResendCooldown();
+            }
+        })();
+    </script>
+}

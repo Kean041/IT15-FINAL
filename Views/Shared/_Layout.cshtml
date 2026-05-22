@@ -1,9 +1,15 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var requestVerificationToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="request-verification-token" content="@requestVerificationToken" />
     <title>@ViewData["Title"] - FinSight ERP</title>
+    <link rel="icon" type="image/png" href="~/favicon.png" />
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
     <!-- Bootstrap Icons -->
@@ -217,36 +223,172 @@
         .topbar-right {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 20px;
         }
 
-        .topbar-right .notification-btn {
-            background: transparent;
+        /* ── Notification Dropdown ── */
+        .notification-dropdown {
+            position: relative;
+        }
+        .notification-btn {
+            background: none;
             border: none;
             color: var(--muted);
-            font-size: 1.2rem;
             position: relative;
             cursor: pointer;
-            padding: 6px;
-            border-radius: 8px;
-            transition: all 0.2s;
+            transition: color 0.2s;
+            padding: 5px;
         }
-
-        .topbar-right .notification-btn:hover {
-            color: var(--text-light);
-            background: rgba(255,255,255,0.06);
+        .notification-btn:hover, .notification-btn.active {
+            color: var(--accent);
         }
-
-        .topbar-right .notification-btn .badge-dot {
+        .notification-btn .badge-count {
             position: absolute;
-            top: 4px;
-            right: 4px;
+            top: 0;
+            right: 0;
+            background: #e74c3c;
+            color: white;
+            font-size: 0.6rem;
+            font-weight: bold;
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            text-align: center;
+            padding: 0;
+            border-radius: 50%;
+            display: none;
+            transform: translate(25%, -25%);
+        }
+        .notification-panel {
+            position: absolute;
+            top: 100%;
+            right: -10px;
+            margin-top: 15px;
+            width: 320px;
+            background: var(--card-bg);
+            border: 1px solid rgba(155, 168, 184, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        .notification-panel.show {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        .notification-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(155, 168, 184, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .notification-header h6 {
+            margin: 0;
+            font-weight: 600;
+            color: var(--text-body);
+        }
+        .mark-all-read {
+            font-size: 0.75rem;
+            color: var(--accent);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+        .mark-all-read:hover {
+            text-decoration: underline;
+        }
+        .notification-body {
+            max-height: 350px;
+            overflow-y: auto;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+        .notification-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(155, 168, 184, 0.05);
+            display: flex;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            color: var(--text-body);
+        }
+        .notification-item:hover {
+            background: rgba(155, 168, 184, 0.05);
+            color: var(--text-body);
+        }
+        .notification-item.unread {
+            background: rgba(5, 130, 142, 0.05);
+        }
+        .notification-item.unread::before {
+            content: '';
+            position: absolute;
+            left: 5px;
+            margin-top: 5px;
             width: 8px;
             height: 8px;
-            border-radius: 50%;
             background: var(--accent);
+            border-radius: 50%;
+        }
+        .notification-icon {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1.1rem;
+        }
+        .icon-system { background: rgba(5,130,142,0.1); color: var(--accent); }
+        .icon-approval { background: rgba(243,156,18,0.1); color: #f39c12; }
+        .icon-payment { background: rgba(46,204,113,0.1); color: #2ecc71; }
+        .icon-subscription { background: rgba(155,89,182,0.1); color: #9b59b6; }
+        .icon-security { background: rgba(231,76,60,0.1); color: #e74c3c; }
+        
+        .notification-content {
+            flex-grow: 1;
+            min-width: 0;
+        }
+        .notification-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin: 0 0 3px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .notification-message {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin: 0 0 5px 0;
+            line-height: 1.3;
+        }
+        .notification-time {
+            font-size: 0.65rem;
+            color: var(--muted);
+            margin: 0;
+        }
+        .notification-empty {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--muted);
+        }
+        .notification-empty i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            display: block;
+            opacity: 0.5;
         }
 
+        .profile-dropdown {
+            position: relative;
+        }
         .profile-btn {
             display: flex;
             align-items: center;
@@ -367,6 +509,98 @@
             background: rgba(155,168,184,0.2);
             border-radius: 10px;
         }
+
+        /* ── Sidebar Submenu ──────────────────────── */
+        .sidebar-nav .nav-submenu-toggle {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 16px;
+            font-size: 0.925rem;
+            font-weight: 500;
+            color: var(--muted);
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+        .sidebar-nav .nav-submenu-toggle:hover {
+            background: rgba(5,130,142,0.12);
+            color: var(--text-light);
+        }
+        .sidebar-nav .nav-submenu-toggle:hover i {
+            color: var(--accent);
+        }
+        .sidebar-nav .nav-submenu-toggle i.toggle-arrow {
+            margin-left: auto;
+            font-size: 0.7rem;
+            transition: transform 0.25s ease;
+        }
+        .sidebar-nav .nav-submenu-toggle.open i.toggle-arrow {
+            transform: rotate(90deg);
+        }
+        .sidebar-nav .nav-submenu-toggle.parent-active {
+            color: var(--text-light);
+        }
+        .sidebar-nav .nav-submenu-toggle.parent-active i:first-child {
+            color: var(--accent);
+        }
+        .sidebar-nav .submenu {
+            list-style: none;
+            padding: 2px 0 4px 0;
+            margin: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .sidebar-nav .submenu.open {
+            max-height: 200px;
+        }
+        .sidebar-nav .submenu li a {
+            padding: 9px 16px 9px 52px;
+            font-size: 0.85rem;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .sidebar-nav .submenu li a:hover {
+            background: rgba(5,130,142,0.10);
+            color: var(--text-light);
+            transform: translateX(3px);
+        }
+        .sidebar-nav .submenu li a i {
+            font-size: 1rem;
+            min-width: 18px;
+            text-align: center;
+        }
+        .sidebar-nav .submenu li.active a {
+            background: var(--accent);
+            color: var(--text-light);
+            box-shadow: 0 3px 12px rgba(5,130,142,0.30);
+            font-weight: 600;
+        }
+        .sidebar-nav .submenu li.active a i {
+            color: var(--text-light);
+        }
+
+        /* ── Sidebar Section Titles ───────────────── */
+        .sidebar-nav .nav-section-title {
+            padding: 18px 16px 6px 16px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: rgba(155, 168, 184, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -386,25 +620,31 @@
                 var roleId = Context.Session.GetInt32("RoleID") ?? 1;
             }
             <ul class="sidebar-nav">
+                <li class="nav-section-title">Main</li>
                 <li class="active">
                     <a asp-controller="Dashboard" asp-action="Index">
                         <i class="bi bi-grid-fill"></i> Dashboard
                     </a>
                 </li>
+                
+                <li class="nav-section-title">Finance & Planning</li>
                 @* Budget Allocation: All roles can view *@
                 <li>
                     <a asp-controller="BudgetAllocation" asp-action="Index">
                         <i class="bi bi-cash-stack"></i> Budget Allocation
                     </a>
                 </li>
-                @* Financial Forecasting: All roles can view *@
-                <li>
-                    <a asp-controller="Forecast" asp-action="Index">
-                        <i class="bi bi-bar-chart-line-fill"></i> Financial Forecasting
-                    </a>
-                </li>
-                @* Scenario Planning: Super Admin, Admin, Finance Manager only *@
+                @* Financial Forecasting: Finance Manager, Admin, SuperAdmin only *@
                 @if (roleId == 0 || roleId == 1 || roleId == 2)
+                {
+                    <li>
+                        <a asp-controller="Forecast" asp-action="Index">
+                            <i class="bi bi-bar-chart-line-fill"></i> Financial Forecasting
+                        </a>
+                    </li>
+                }
+                @* Scenario Planning: SuperAdmin, Admin, Finance Manager, Department Head *@
+                @if (roleId == 0 || roleId == 1 || roleId == 2 || roleId == 3)
                 {
                     <li>
                         <a asp-controller="Scenario" asp-action="Planning">
@@ -412,25 +652,55 @@
                         </a>
                     </li>
                 }
-                @* Variance Analysis: All roles can view *@
-                <li>
-                    <a asp-controller="Variance" asp-action="Analysis">
-                        <i class="bi bi-clipboard2-data-fill"></i> Variance Analysis
-                    </a>
-                </li>
+                @* Variance Analysis: Finance Manager, Admin, SuperAdmin only *@
+                @if (roleId == 0 || roleId == 1 || roleId == 2)
+                {
+                    <li>
+                        <a asp-controller="Variance" asp-action="Analysis">
+                            <i class="bi bi-clipboard2-data-fill"></i> Variance Analysis
+                        </a>
+                    </li>
+                }
+
+                <li class="nav-section-title">Operations</li>
                 @* Approval Workflow: All roles can view *@
                 <li>
                     <a asp-controller="Workflow" asp-action="Approval">
                         <i class="bi bi-shield-check"></i> Approval Workflow
                     </a>
                 </li>
+
                 @* User Management: Super Admin and Admin only *@
                 @if (roleId == 0 || roleId == 1)
                 {
+                    <li class="nav-section-title">System & Security</li>
                     <li>
                         <a asp-controller="User" asp-action="Index">
                             <i class="bi bi-people-fill"></i> User Management
                         </a>
+                    </li>
+                    <li>
+                        @{
+                            var currentCtrl = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+                            var currentAct = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+                            bool isAuditSection = (currentCtrl == "User") && (currentAct == "SystemLogs" || currentAct == "SecurityLogs");
+                        }
+                        <button class="nav-submenu-toggle @(isAuditSection ? "parent-active open" : "")" onclick="toggleSubmenu(this)">
+                            <i class="bi bi-shield-check"></i> Audit Logs
+                            <i class="bi bi-chevron-right toggle-arrow"></i>
+                        </button>
+                        <ul class="submenu @(isAuditSection ? "open" : "")">
+                            <li class="@(currentAct == "SystemLogs" ? "active" : "")">
+                                <a asp-controller="User" asp-action="SystemLogs">
+                                    <i class="bi bi-gear"></i> System Logs
+                                </a>
+                            </li>
+                            <li class="@(currentAct == "SecurityLogs" ? "active" : "")">
+                                <a asp-controller="User" asp-action="SecurityLogs">
+                                    <i class="bi bi-shield-lock"></i> Security Logs
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                 }
             </ul>
@@ -452,11 +722,23 @@
                 </button>
 
                 <div class="topbar-right">
-                    <!-- Notification bell -->
-                    <button class="notification-btn" title="Notifications">
-                        <i class="bi bi-bell"></i>
-                        <span class="badge-dot"></span>
-                    </button>
+                    <!-- Notification Dropdown -->
+                    <div class="notification-dropdown">
+                        <button class="notification-btn" id="notificationBtn" title="Notifications">
+                            <i class="bi bi-bell fs-5"></i>
+                            <span class="badge-count" id="notificationBadge">0</span>
+                        </button>
+                        
+                        <div class="notification-panel" id="notificationPanel">
+                            <div class="notification-header">
+                                <h6>Notifications</h6>
+                                <button class="mark-all-read" onclick="markAllAsRead()">Mark all as read</button>
+                            </div>
+                            <ul class="notification-body" id="notificationList">
+                                <!-- Populated via AJAX -->
+                            </ul>
+                        </div>
+                    </div>
 
                     <!-- Profile dropdown -->
                     <div class="dropdown">
@@ -494,27 +776,6 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const sidebar  = document.getElementById('sidebar');
-            const main     = document.getElementById('main-content');
-            const toggle   = document.getElementById('sidebarToggle');
-            const overlay  = document.getElementById('sidebarOverlay');
-            const isMobile = () => window.innerWidth < 992;
-
-            toggle.addEventListener('click', function () {
-                if (isMobile()) {
-                    sidebar.classList.toggle('mobile-open');
-                    overlay.classList.toggle('show');
-                } else {
-                    sidebar.classList.toggle('collapsed');
-                    main.classList.toggle('expanded');
-                }
-            });
-
-            overlay.addEventListener('click', function () {
-                sidebar.classList.remove('mobile-open');
-                overlay.classList.remove('show');
-            });
-
             // Active state based on current URL
             const currentPath = window.location.pathname.toLowerCase();
             const links = document.querySelectorAll('.sidebar-nav li');
@@ -533,6 +794,144 @@
                 }
             });
         });
+        
+        // Sidebar mobile toggle
+        document.getElementById('sidebarToggle').addEventListener('click', function () {
+            document.getElementById('sidebar').classList.add('active');
+            document.getElementById('sidebarOverlay').classList.add('active');
+        });
+
+        document.getElementById('sidebarOverlay').addEventListener('click', function () {
+            document.getElementById('sidebar').classList.remove('active');
+            document.getElementById('sidebarOverlay').classList.remove('active');
+        });
+
+        function toggleSubmenu(btn) {
+            btn.classList.toggle('open');
+            var submenu = btn.nextElementSibling;
+            submenu.classList.toggle('open');
+        }
+
+        // Notification System
+        let notifBtn, notifPanel, notifBadge, notifList;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            notifBtn = document.getElementById('notificationBtn');
+            notifPanel = document.getElementById('notificationPanel');
+            notifBadge = document.getElementById('notificationBadge');
+            notifList = document.getElementById('notificationList');
+
+            if (notifBtn && notifPanel) {
+                notifBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    notifPanel.classList.toggle('show');
+                    if (notifPanel.classList.contains('show')) {
+                        fetchNotifications();
+                    }
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!notifBtn.contains(e.target) && !notifPanel.contains(e.target)) {
+                        notifPanel.classList.remove('show');
+                    }
+                });
+            }
+        });
+
+        async function fetchUnreadCount() {
+            try {
+                const res = await fetch('/api/notification/unread-count');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.count > 0) {
+                        notifBadge.textContent = data.count > 99 ? '99+' : data.count;
+                        notifBadge.style.display = 'block';
+                    } else {
+                        notifBadge.style.display = 'none';
+                    }
+                }
+            } catch(e) { console.error("Error fetching notification count", e); }
+        }
+
+        function getIconClass(type) {
+            switch(type.toLowerCase()) {
+                case 'approval': return 'bi-shield-check icon-approval';
+                case 'payment': return 'bi-wallet2 icon-payment';
+                case 'subscription': return 'bi-card-checklist icon-subscription';
+                case 'security': return 'bi-shield-lock icon-security';
+                default: return 'bi-info-circle icon-system';
+            }
+        }
+
+        function authenticatedPostOptions() {
+            const token = document.querySelector('meta[name="request-verification-token"]')?.content;
+            return {
+                method: 'POST',
+                headers: {
+                    'RequestVerificationToken': token || ''
+                }
+            };
+        }
+
+        async function fetchNotifications() {
+            try {
+                const res = await fetch('/api/notification/list');
+                if (res.ok) {
+                    const data = await res.json();
+                    notifList.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        notifList.innerHTML = `
+                            <div class="notification-empty">
+                                <i class="bi bi-bell-slash"></i>
+                                <p class="mb-0">No notifications yet.</p>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    data.forEach(n => {
+                        const li = document.createElement('li');
+                        const url = n.url ? n.url : 'javascript:void(0)';
+                        li.innerHTML = `
+                            <a href="${url}" class="notification-item ${n.isRead ? '' : 'unread'}" onclick="markAsRead(${n.id}, event)">
+                                <div class="notification-icon ${getIconClass(n.type).split(' ')[1]}">
+                                    <i class="bi ${getIconClass(n.type).split(' ')[0]}"></i>
+                                </div>
+                                <div class="notification-content">
+                                    <h6 class="notification-title">${n.title}</h6>
+                                    <p class="notification-message">${n.message}</p>
+                                    <p class="notification-time">${n.date}</p>
+                                </div>
+                            </a>
+                        `;
+                        notifList.appendChild(li);
+                    });
+                }
+            } catch(e) { console.error("Error fetching notifications", e); }
+        }
+
+        async function markAsRead(id, e) {
+            try {
+                await fetch(`/api/notification/mark-read/${id}`, authenticatedPostOptions());
+                fetchUnreadCount();
+                // We let the default action (navigation) proceed if it's a real URL
+            } catch(e) { console.error("Error marking as read", e); }
+        }
+
+        async function markAllAsRead() {
+            try {
+                await fetch(`/api/notification/mark-all-read`, authenticatedPostOptions());
+                fetchUnreadCount();
+                fetchNotifications();
+            } catch(e) { console.error("Error marking all as read", e); }
+        }
+
+        // Poll every 60 seconds
+        setInterval(fetchUnreadCount, 60000);
+        // Initial load
+        fetchUnreadCount();
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)

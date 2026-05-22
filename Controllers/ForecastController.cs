@@ -1,6 +1,7 @@
 using FinSight.Data;
 using FinSight.Models;
 using FinSight.Helpers;
+using FinSight.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -16,10 +17,12 @@ namespace FinSight.Controllers
     public class ForecastController : BaseController
     {
         private readonly FinSightDbContext _context;
+        private readonly AlphaVantageService _alphaVantage;
 
-        public ForecastController(FinSightDbContext context)
+        public ForecastController(FinSightDbContext context, AlphaVantageService alphaVantage)
         {
             _context = context;
+            _alphaVantage = alphaVantage;
         }
 
         // GET: Forecast
@@ -27,7 +30,9 @@ namespace FinSight.Controllers
         {
             if (!IsAuthenticated) return RedirectToLogin();
 
-            // All roles can view forecasts
+            // RBAC: Only Finance Manager, Admin, SuperAdmin can access forecasting
+            if (!CanAccessForecasting) return AccessDenied();
+
             int? tenantFilter = GetTenantFilter();
 
             int pageSize = 10;
@@ -185,6 +190,21 @@ namespace FinSight.Controllers
             ViewBag.CanWrite  = CanWriteFinancials;
             ViewBag.CanDelete = CanDeleteRecords;
             ViewBag.RoleID    = CurrentRoleID;
+
+            // ── Alpha Vantage: Economic Indicators ─────
+            var roleId = CurrentRoleID ?? 1;
+            if (roleId == Roles.SuperAdmin || roleId == Roles.Admin ||
+                roleId == Roles.FinanceManager || roleId == Roles.Executive)
+            {
+                try
+                {
+                    ViewBag.EconomicData = await _alphaVantage.GetEconomicDataAsync();
+                }
+                catch
+                {
+                    ViewBag.EconomicData = null;
+                }
+            }
 
             return View(pagedData);
         }

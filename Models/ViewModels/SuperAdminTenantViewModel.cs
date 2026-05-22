@@ -9,6 +9,7 @@ namespace FinSight.Models.ViewModels
         public int TotalTenants { get; set; }
         public int ActiveTenants { get; set; }
         public int SuspendedTenants { get; set; }
+        public int PendingTenants { get; set; }
         public int NewTenantsThisMonth { get; set; }
 
         // Data list
@@ -28,7 +29,8 @@ namespace FinSight.Models.ViewModels
         public string CompanyName { get; set; } = string.Empty;
         public string AdminEmail { get; set; } = string.Empty;
         public string SubscriptionPlan { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty; // "Active", "Inactive", "Suspended"
+        public string Status { get; set; } = string.Empty; // "Active", "Pending", "Suspended", "Inactive"
         public DateTime CreatedDate { get; set; }
+        public int TotalUsers { get; set; }
     }
 }

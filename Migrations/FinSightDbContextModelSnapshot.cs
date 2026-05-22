@@ -22,6 +22,55 @@ namespace FinSight.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("FinSight.Models.AuditLog", b =>
+                {
+                    b.Property<int>("AuditLogID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AuditLogID"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("IPAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("LogType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("TenantID")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("AuditLogID");
+
+                    b.HasIndex("TenantID");
+
+                    b.HasIndex("UserID");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("FinSight.Models.Budget", b =>
                 {
                     b.Property<int>("BudgetID")
@@ -71,7 +120,87 @@ namespace FinSight.Migrations
 
                     b.HasIndex("TenantID");
 
-                    b.ToTable("Budgets", (string)null);
+                    b.ToTable("Budgets");
+                });
+
+            modelBuilder.Entity("FinSight.Models.BudgetRequest", b =>
+                {
+                    b.Property<int>("RequestID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RequestID"));
+
+                    b.Property<int?>("ApprovedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ApprovedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("BudgetID")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("CreatedAt");
+
+                    b.Property<DateTime>("DateNeeded")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<int>("DepartmentID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("RequestedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("SubmittedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasDefaultValue("Budget Request");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("UpdatedAt");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("RequestID");
+
+                    b.HasIndex("ApprovedBy");
+
+                    b.HasIndex("BudgetID");
+
+                    b.HasIndex("DepartmentID");
+
+                    b.HasIndex("SubmittedBy");
+
+                    b.HasIndex("TenantID");
+
+                    b.ToTable("BudgetRequests");
                 });
 
             modelBuilder.Entity("FinSight.Models.Department", b =>
@@ -98,7 +227,55 @@ namespace FinSight.Migrations
 
                     b.HasIndex("TenantID");
 
-                    b.ToTable("Departments", (string)null);
+                    b.ToTable("Departments");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Expense", b =>
+                {
+                    b.Property<int>("ExpenseID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ExpenseID"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("BudgetID")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("CreatedAt");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DepartmentID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("TenantID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("ExpenseID");
+
+                    b.HasIndex("BudgetID");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("DepartmentID");
+
+                    b.HasIndex("TenantID");
+
+                    b.ToTable("Expenses");
                 });
 
             modelBuilder.Entity("FinSight.Models.Forecast", b =>
@@ -146,7 +323,151 @@ namespace FinSight.Migrations
 
                     b.HasIndex("TenantID");
 
-                    b.ToTable("Forecasts", (string)null);
+                    b.ToTable("Forecasts");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Notification", b =>
+                {
+                    b.Property<int>("NotificationID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NotificationID"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("NotificationType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("RedirectUrl")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int?>("TenantID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("UserID")
+                        .HasColumnType("int");
+
+                    b.HasKey("NotificationID");
+
+                    b.HasIndex("TenantID");
+
+                    b.HasIndex("UserID");
+
+                    b.ToTable("Notifications");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Payment", b =>
+                {
+                    b.Property<int>("PaymentID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PaymentID"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime>("PaymentDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("StripePaymentIntentID")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("StripeSessionID")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("SubscriptionID")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantID")
+                        .HasColumnType("int");
+
+                    b.HasKey("PaymentID");
+
+                    b.HasIndex("SubscriptionID");
+
+                    b.HasIndex("TenantID");
+
+                    b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Plan", b =>
+                {
+                    b.Property<int>("PlanID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PlanID"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("DurationInMonths")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("StripePriceID")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("PlanID");
+
+                    b.ToTable("Plans");
                 });
 
             modelBuilder.Entity("FinSight.Models.Scenario", b =>
@@ -182,7 +503,7 @@ namespace FinSight.Migrations
 
                     b.HasIndex("TenantID");
 
-                    b.ToTable("Scenarios", (string)null);
+                    b.ToTable("Scenarios");
                 });
 
             modelBuilder.Entity("FinSight.Models.ScenarioDetail", b =>
@@ -222,7 +543,51 @@ namespace FinSight.Migrations
 
                     b.HasIndex("TenantID");
 
-                    b.ToTable("ScenarioDetails", (string)null);
+                    b.ToTable("ScenarioDetails");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Subscription", b =>
+                {
+                    b.Property<int>("SubscriptionID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SubscriptionID"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("PlanID")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("StripeSubscriptionID")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("TenantID")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("SubscriptionID");
+
+                    b.HasIndex("PlanID");
+
+                    b.HasIndex("TenantID");
+
+                    b.ToTable("Subscriptions");
                 });
 
             modelBuilder.Entity("FinSight.Models.Tenant", b =>
@@ -240,9 +605,25 @@ namespace FinSight.Migrations
                     b.Property<DateTime?>("CreatedDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("StripeCustomerId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("StripeSubscriptionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SubscriptionPlan")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SubscriptionStatus")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.HasKey("TenantID");
 
-                    b.ToTable("Tenants", (string)null);
+                    b.ToTable("Tenants");
                 });
 
             modelBuilder.Entity("FinSight.Models.User", b =>
@@ -265,6 +646,12 @@ namespace FinSight.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<int>("FailedLoginAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FailedOTPAttempts")
+                        .HasColumnType("int");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -272,6 +659,25 @@ namespace FinSight.Migrations
 
                     b.Property<bool>("IsArchived")
                         .HasColumnType("bit");
+
+                    b.Property<bool>("IsTwoFactorEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastOTPSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LockoutEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OTPCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("OTPExpiration")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("OTPLockoutEnd")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -283,6 +689,10 @@ namespace FinSight.Migrations
 
                     b.Property<int?>("TenantID")
                         .HasColumnType("int");
+
+                    b.Property<string>("TwoFactorSecretKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2")
@@ -297,7 +707,24 @@ namespace FinSight.Migrations
 
                     b.HasIndex("TenantID");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("FinSight.Models.AuditLog", b =>
+                {
+                    b.HasOne("FinSight.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FinSight.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FinSight.Models.Budget", b =>
@@ -327,6 +754,48 @@ namespace FinSight.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("FinSight.Models.BudgetRequest", b =>
+                {
+                    b.HasOne("FinSight.Models.User", "Approver")
+                        .WithMany()
+                        .HasForeignKey("ApprovedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FinSight.Models.Budget", "Budget")
+                        .WithMany()
+                        .HasForeignKey("BudgetID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FinSight.Models.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FinSight.Models.User", "Submitter")
+                        .WithMany()
+                        .HasForeignKey("SubmittedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FinSight.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Approver");
+
+                    b.Navigation("Budget");
+
+                    b.Navigation("Department");
+
+                    b.Navigation("Submitter");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("FinSight.Models.Department", b =>
                 {
                     b.HasOne("FinSight.Models.Tenant", "Tenant")
@@ -334,6 +803,41 @@ namespace FinSight.Migrations
                         .HasForeignKey("TenantID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Expense", b =>
+                {
+                    b.HasOne("FinSight.Models.Budget", "Budget")
+                        .WithMany()
+                        .HasForeignKey("BudgetID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FinSight.Models.User", "Creator")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FinSight.Models.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FinSight.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Budget");
+
+                    b.Navigation("Creator");
+
+                    b.Navigation("Department");
 
                     b.Navigation("Tenant");
                 });
@@ -369,6 +873,40 @@ namespace FinSight.Migrations
                     b.Navigation("Creator");
 
                     b.Navigation("Department");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Notification", b =>
+                {
+                    b.HasOne("FinSight.Models.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantID");
+
+                    b.HasOne("FinSight.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserID");
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Payment", b =>
+                {
+                    b.HasOne("FinSight.Models.Subscription", "Subscription")
+                        .WithMany("Payments")
+                        .HasForeignKey("SubscriptionID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FinSight.Models.Tenant", "Tenant")
+                        .WithMany("Payments")
+                        .HasForeignKey("TenantID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Subscription");
 
                     b.Navigation("Tenant");
                 });
@@ -427,6 +965,25 @@ namespace FinSight.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("FinSight.Models.Subscription", b =>
+                {
+                    b.HasOne("FinSight.Models.Plan", "Plan")
+                        .WithMany("Subscriptions")
+                        .HasForeignKey("PlanID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FinSight.Models.Tenant", "Tenant")
+                        .WithMany("Subscriptions")
+                        .HasForeignKey("TenantID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Plan");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("FinSight.Models.User", b =>
                 {
                     b.HasOne("FinSight.Models.Department", "Department")
@@ -435,17 +992,37 @@ namespace FinSight.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("FinSight.Models.Tenant", "Tenant")
-                        .WithMany()
-                        .HasForeignKey("TenantID");
+                        .WithMany("Users")
+                        .HasForeignKey("TenantID")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Department");
 
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("FinSight.Models.Plan", b =>
+                {
+                    b.Navigation("Subscriptions");
+                });
+
             modelBuilder.Entity("FinSight.Models.Scenario", b =>
                 {
                     b.Navigation("ScenarioDetails");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Subscription", b =>
+                {
+                    b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("FinSight.Models.Tenant", b =>
+                {
+                    b.Navigation("Payments");
+
+                    b.Navigation("Subscriptions");
+
+                    b.Navigation("Users");
                 });
 #pragma warning restore 612, 618
         }

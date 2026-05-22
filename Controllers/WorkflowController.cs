@@ -2,6 +2,7 @@ using FinSight.Data;
 using FinSight.Models;
 using FinSight.Models.ViewModels;
 using FinSight.Helpers;
+using FinSight.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -14,10 +15,14 @@ namespace FinSight.Controllers
     public class WorkflowController : BaseController
     {
         private readonly FinSightDbContext _context;
+        private readonly AuditLogService _auditLog;
+        private readonly NotificationService _notification;
 
-        public WorkflowController(FinSightDbContext context)
+        public WorkflowController(FinSightDbContext context, AuditLogService auditLog, NotificationService notification)
         {
             _context = context;
+            _auditLog = auditLog;
+            _notification = notification;
         }
 
         // ─────────────────────────────────────────────
@@ -102,6 +107,9 @@ namespace FinSight.Controllers
                 RequestedAmount = r.RequestedAmount,
                 BudgetCategory = r.Budget?.Category ?? "N/A",
                 BudgetID = r.BudgetID,
+                Title = r.Title,
+                Description = r.Description,
+                DateNeeded = r.DateNeeded,
                 Status = r.Status,
                 SubmittedByName = r.Submitter?.FullName ?? "Unknown",
                 SubmittedDate = r.CreatedAt,
@@ -173,7 +181,7 @@ namespace FinSight.Controllers
         // ─────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitRequest(int BudgetID, decimal RequestedAmount)
+        public async Task<IActionResult> SubmitRequest(int BudgetID, string Title, string? Description, decimal RequestedAmount, DateTime DateNeeded)
         {
             if (!IsAuthenticated) return RedirectToLogin();
 
@@ -184,6 +192,12 @@ namespace FinSight.Controllers
             if (RequestedAmount <= 0)
             {
                 TempData["Error"] = "Requested amount must be greater than zero.";
+                return RedirectToAction(nameof(Approval));
+            }
+
+            if (string.IsNullOrWhiteSpace(Title))
+            {
+                TempData["Error"] = "Request title is required.";
                 return RedirectToAction(nameof(Approval));
             }
 
@@ -198,9 +212,25 @@ namespace FinSight.Controllers
                 return RedirectToAction(nameof(Approval));
             }
 
+            // Calculate remaining budget
+            var totalApproved = await _context.BudgetRequests
+                .Where(r => r.BudgetID == BudgetID && r.Status == "Approved")
+                .SumAsync(r => r.RequestedAmount);
+
+            var remaining = budget.Amount - totalApproved;
+
+            if (RequestedAmount > remaining)
+            {
+                TempData["Error"] = $"Requested amount (₱{RequestedAmount:N2}) exceeds the remaining allocated budget (₱{remaining:N2}).";
+                return RedirectToAction(nameof(Approval));
+            }
+
             var request = new BudgetRequest
             {
+                Title = Title.Trim(),
+                Description = Description?.Trim(),
                 RequestedAmount = RequestedAmount,
+                DateNeeded = DateNeeded,
                 DepartmentID = budget.DepartmentID,
                 TenantID = tenantId,
                 BudgetID = BudgetID,
@@ -211,6 +241,17 @@ namespace FinSight.Controllers
 
             _context.BudgetRequests.Add(request);
             await _context.SaveChangesAsync();
+
+            // Audit: Budget Submission
+            await _auditLog.LogSystemAction(tenantId, CurrentUserID,
+                "BudgetSubmitted", $"Budget request #{request.RequestID} for ${RequestedAmount:N2} submitted.",
+                HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            // Notify Executives/Admins
+            await _notification.CreateNotificationAsync(tenantId, null, "Approval", 
+                "New Budget Request", 
+                $"A new budget request for ${RequestedAmount:N2} was submitted and requires approval.", 
+                "/Workflow/Approval");
 
             TempData["Success"] = "Budget request submitted successfully.";
             return RedirectToAction(nameof(Approval));
@@ -257,6 +298,17 @@ namespace FinSight.Controllers
             _context.BudgetRequests.Update(request);
             await _context.SaveChangesAsync();
 
+            // Audit: Budget Approval
+            await _auditLog.LogSystemAction(CurrentTenantID, CurrentUserID,
+                "BudgetApproved", $"Budget request #{request.RequestID} approved.",
+                HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            // Notify Submitter
+            await _notification.CreateNotificationAsync(request.TenantID, request.SubmittedBy, "Approval", 
+                "Budget Approved", 
+                $"Your budget request #{request.RequestID} has been approved.", 
+                "/Workflow/Approval");
+
             TempData["Success"] = "Request approved successfully.";
             return RedirectToAction(nameof(Approval));
         }
@@ -300,6 +352,17 @@ namespace FinSight.Controllers
 
             _context.BudgetRequests.Update(request);
             await _context.SaveChangesAsync();
+
+            // Audit: Budget Rejection
+            await _auditLog.LogSystemAction(CurrentTenantID, CurrentUserID,
+                "BudgetRejected", $"Budget request #{request.RequestID} rejected. Reason: {rejectionReason ?? "No reason provided"}.",
+                HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            // Notify Submitter
+            await _notification.CreateNotificationAsync(request.TenantID, request.SubmittedBy, "Approval", 
+                "Budget Rejected", 
+                $"Your budget request #{request.RequestID} was rejected. Reason: {rejectionReason ?? "N/A"}", 
+                "/Workflow/Approval");
 
             TempData["Success"] = "Request rejected.";
             return RedirectToAction(nameof(Approval));

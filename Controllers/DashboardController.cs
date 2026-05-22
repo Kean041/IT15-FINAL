@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using FinSight.Data;
 using FinSight.Models.ViewModels;
+using FinSight.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,10 +13,12 @@ namespace FinSight.Controllers
     public class DashboardController : BaseController
     {
         private readonly FinSightDbContext _db;
+        private readonly AlphaVantageService _alphaVantage;
 
-        public DashboardController(FinSightDbContext db)
+        public DashboardController(FinSightDbContext db, AlphaVantageService alphaVantage)
         {
             _db = db;
+            _alphaVantage = alphaVantage;
         }
 
         public async Task<IActionResult> Index()
@@ -30,17 +33,17 @@ namespace FinSight.Controllers
 
             // ── KPI: Total Budget ──────────────────────
             var budgetsQuery = _db.Budgets.AsQueryable();
-            if (tenantFilter != null) budgetsQuery = budgetsQuery.Where(b => b.TenantID == tenantFilter);
+            if (tenantFilter != null) budgetsQuery = budgetsQuery.Where(b => b.TenantID == tenantFilter.Value);
             var totalBudget = await budgetsQuery.SumAsync(b => (decimal?)b.Amount) ?? 0;
 
             // ── KPI: Total Expenses ────────────────────
             var expensesQuery = _db.Expenses.AsQueryable();
-            if (tenantFilter != null) expensesQuery = expensesQuery.Where(e => e.TenantID == tenantFilter);
+            if (tenantFilter != null) expensesQuery = expensesQuery.Where(e => e.TenantID == tenantFilter.Value);
             var totalExpenses = await expensesQuery.SumAsync(e => (decimal?)e.Amount) ?? 0;
 
             // ── KPI: Pending Requests ──────────────────
             var requestsQuery = _db.BudgetRequests.AsQueryable();
-            if (tenantFilter != null) requestsQuery = requestsQuery.Where(r => r.TenantID == tenantFilter);
+            if (tenantFilter != null) requestsQuery = requestsQuery.Where(r => r.TenantID == tenantFilter.Value);
             var pendingRequests = await requestsQuery.CountAsync(r => r.Status == "Pending");
 
             // ── Bar Chart: Budget vs Expenses by Department ──
@@ -103,6 +106,22 @@ namespace FinSight.Controllers
                 })
                 .ToListAsync();
 
+            // ── Alpha Vantage: Exchange Rates ──────────
+            MarketDataViewModel? marketData = null;
+            var roleId = CurrentRoleID ?? 1;
+            if (roleId == Helpers.Roles.SuperAdmin || roleId == Helpers.Roles.Admin ||
+                roleId == Helpers.Roles.FinanceManager || roleId == Helpers.Roles.Executive)
+            {
+                try
+                {
+                    marketData = await _alphaVantage.GetAllExchangeRatesAsync();
+                }
+                catch (Exception)
+                {
+                    marketData = new MarketDataViewModel { HasError = true, ErrorMessage = "Market data temporarily unavailable." };
+                }
+            }
+
             var viewModel = new DashboardViewModel
             {
                 TotalBudget      = totalBudget,
@@ -115,7 +134,8 @@ namespace FinSight.Controllers
                 LineChartData    = lineData,
                 RecentRequests   = recentRequests,
                 UserName         = CurrentFullName,
-                RoleName         = HttpContext.Session.GetString("RoleName") ?? "Admin"
+                RoleName         = HttpContext.Session.GetString("RoleName") ?? "Admin",
+                MarketData       = marketData
             };
 
             return View(viewModel);
