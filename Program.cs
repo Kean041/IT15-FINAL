@@ -66,7 +66,10 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<FinSightDbContext>();
         var logger = services.GetRequiredService<ILogger<Program>>();
-        
+
+        // Repair legacy/manual expense tables before migrations or page queries use them.
+        await DbInitializer.EnsureExpenseSchemaAsync(context, logger);
+
         // Automatically apply pending migrations on startup
         await context.Database.MigrateAsync();
         

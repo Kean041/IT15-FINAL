@@ -10,6 +10,8 @@ namespace FinSight.Models
         [Key]
         public int ExpenseID { get; set; }
 
+        public int? BudgetRequestID { get; set; }
+
         [Required]
         public int BudgetID { get; set; }
 
@@ -21,6 +23,14 @@ namespace FinSight.Models
 
         [Required]
         [StringLength(255)]
+        public string ExpenseTitle { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(255)]
+        public string Category { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(1000)]
         public string Description { get; set; } = string.Empty;
 
         [Required]
@@ -28,15 +38,28 @@ namespace FinSight.Models
         public decimal Amount { get; set; }
 
         [Required]
+        [Column("Date")]
+        public DateTime ExpenseDate { get; set; } = DateTime.Now;
+
+        [Required]
+        [NotMapped]
         public int Year { get; set; }
 
         [Required]
+        [StringLength(50)]
+        public string Status { get; set; } = "Recorded"; // Recorded, Verified, Archived
+
+        [Required]
+        [NotMapped]
         public int CreatedBy { get; set; }
 
         [Column("CreatedAt")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         // Navigation Properties
+        [ForeignKey("BudgetRequestID")]
+        public BudgetRequest? BudgetRequest { get; set; }
+
         [ForeignKey("BudgetID")]
         public Budget? Budget { get; set; }
 
@@ -46,7 +69,7 @@ namespace FinSight.Models
         [ForeignKey("TenantID")]
         public Tenant? Tenant { get; set; }
 
-        [ForeignKey("CreatedBy")]
+        [NotMapped]
         public User? Creator { get; set; }
     }
 }

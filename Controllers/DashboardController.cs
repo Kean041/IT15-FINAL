@@ -74,8 +74,8 @@ namespace FinSight.Controllers
             // ── Line Chart: Monthly Expenses Trend (current year) ──
             var currentYear = DateTime.Now.Year;
             var monthlyExpenses = await expensesQuery
-                .Where(e => e.CreatedAt.Year == currentYear)
-                .GroupBy(e => e.CreatedAt.Month)
+                .Where(e => e.ExpenseDate.Year == currentYear)
+                .GroupBy(e => e.ExpenseDate.Month)
                 .Select(g => new { Month = g.Key, Total = g.Sum(e => e.Amount) })
                 .OrderBy(g => g.Month)
                 .ToListAsync();

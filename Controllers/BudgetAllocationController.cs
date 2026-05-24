@@ -35,6 +35,9 @@ namespace FinSight.Controllers
             if (!IsAuthenticated) return RedirectToLogin();
 
             int? tenantFilter = GetTenantFilter();
+            int? departmentHeadDepartmentId = IsDeptHead
+                ? await GetCurrentDepartmentHeadDepartmentIdAsync()
+                : null;
 
             int pageSize = 10;
             var query = _context.Budgets
@@ -49,9 +52,14 @@ namespace FinSight.Controllers
             }
 
             // ── Department Head: restrict to their own department only ──
-            if (IsDeptHead && CurrentDepartmentID.HasValue)
+            if (IsDeptHead && departmentHeadDepartmentId.HasValue)
             {
-                query = query.Where(b => b.DepartmentID == CurrentDepartmentID.Value);
+                query = query.Where(b => b.DepartmentID == departmentHeadDepartmentId.Value);
+            }
+            else if (IsDeptHead)
+            {
+                query = query.Where(b => false);
+                ViewBag.DepartmentAssignmentMissing = true;
             }
 
             // 1. Text Search filtering
@@ -103,9 +111,9 @@ namespace FinSight.Controllers
             ViewBag.ApprovedAmounts = approvedAmounts;
 
             // ── Department Head: load their request history ──
-            if (IsDeptHead && CurrentDepartmentID.HasValue)
+            if (IsDeptHead && departmentHeadDepartmentId.HasValue)
             {
-                int deptId      = CurrentDepartmentID.Value;
+                int deptId      = departmentHeadDepartmentId.Value;
                 int deptTenant  = tenantFilter ?? 0;
                 int deptUserId  = CurrentUserID!.Value;
 
@@ -143,6 +151,7 @@ namespace FinSight.Controllers
             int totalRecords = filteredResults.Count;
             int totalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
             if(totalPages == 0) totalPages = 1;
+            if(page < 1) page = 1;
 
             var pagedData = filteredResults.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
@@ -168,15 +177,15 @@ namespace FinSight.Controllers
 
             ViewBag.Statuses = new List<SelectListItem>
             {
+                new SelectListItem { Value = "Active", Text = "Active", Selected = true },
                 new SelectListItem { Value = "Draft", Text = "Draft" },
-                new SelectListItem { Value = "Active", Text = "Active" },
                 new SelectListItem { Value = "Closed", Text = "Closed" }
             };
 
             // ── Budget dropdown for Department Head submit request modal ──
-            if (IsDeptHead && CurrentDepartmentID.HasValue)
+            if (IsDeptHead && departmentHeadDepartmentId.HasValue)
             {
-                int dropDeptId = CurrentDepartmentID.Value;
+                int dropDeptId = departmentHeadDepartmentId.Value;
 
                 var deptBudgets = await _context.Budgets
                     .Include(b => b.Department)
@@ -216,8 +225,12 @@ namespace FinSight.Controllers
              int userId   = CurrentUserID!.Value;
 
              string trimmedDeptName = DepartmentName?.Trim() ?? "General";
+             string allocationStatus = string.IsNullOrWhiteSpace(Status) ? "Active" : Status;
 
-             var department = await _context.Departments.FirstOrDefaultAsync(d => d.DepartmentName == trimmedDeptName && d.TenantID == tenantId);
+             var normalizedDeptName = trimmedDeptName.ToLower();
+             var department = await _context.Departments.FirstOrDefaultAsync(d =>
+                 d.TenantID == tenantId &&
+                 d.DepartmentName.ToLower() == normalizedDeptName);
              if (department == null)
              {
                  department = new Department { DepartmentName = trimmedDeptName, TenantID = tenantId };
@@ -232,7 +245,7 @@ namespace FinSight.Controllers
                  Category = Category,
                  Amount = Amount,
                  Year = Year,
-                 Status = Status,
+                 Status = allocationStatus,
                  CreatedBy = userId,
                  CreatedAt = DateTime.Now,
                  UpdatedAt = DateTime.Now
@@ -247,7 +260,7 @@ namespace FinSight.Controllers
                  HttpContext.Connection.RemoteIpAddress?.ToString());
 
              // Notify tenant admins about new allocation
-             await _notification.CreateNotificationAsync(tenantId, null, "System",
+             await _notification.CreateTenantBroadcastAsync(tenantId, "System",
                  "Budget Allocation Created",
                  $"A new budget allocation '{Category}' of ₱{Amount:N2} was created for {trimmedDeptName}.",
                  "/BudgetAllocation");
@@ -273,7 +286,10 @@ namespace FinSight.Controllers
             if (existing != null)
             {
                 string trimmedDeptName = DepartmentName?.Trim() ?? "General";
-                var department = await _context.Departments.FirstOrDefaultAsync(d => d.DepartmentName == trimmedDeptName && d.TenantID == existing.TenantID);
+                var normalizedDeptName = trimmedDeptName.ToLower();
+                var department = await _context.Departments.FirstOrDefaultAsync(d =>
+                    d.TenantID == existing.TenantID &&
+                    d.DepartmentName.ToLower() == normalizedDeptName);
                 if (department == null)
                 {
                     department = new Department { DepartmentName = trimmedDeptName, TenantID = existing.TenantID };
@@ -311,17 +327,52 @@ namespace FinSight.Controllers
 
             int? tenantFilter = GetTenantFilter();
             
-            var existing = await _context.Budgets.FirstOrDefaultAsync(b => b.BudgetID == id && (tenantFilter == null || b.TenantID == tenantFilter.Value));
-            if (existing != null)
+            var existing = await _context.Budgets
+                .Include(b => b.Department)
+                .FirstOrDefaultAsync(b => b.BudgetID == id && (tenantFilter == null || b.TenantID == tenantFilter.Value));
+
+            if (existing == null)
             {
+                TempData["Error"] = "Budget allocation not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // Remove all child records that reference this BudgetID
+                var relatedForecasts = await _context.Forecasts.Where(f => f.BudgetID == id).ToListAsync();
+                if (relatedForecasts.Any()) _context.Forecasts.RemoveRange(relatedForecasts);
+
+                var relatedExpenses = await _context.Expenses.Where(e => e.BudgetID == id).ToListAsync();
+                if (relatedExpenses.Any()) _context.Expenses.RemoveRange(relatedExpenses);
+
+                var relatedRequests = await _context.BudgetRequests.Where(r => r.BudgetID == id).ToListAsync();
+                if (relatedRequests.Any()) _context.BudgetRequests.RemoveRange(relatedRequests);
+
+                var relatedScenarioDetails = await _context.ScenarioDetails.Where(sd => sd.BudgetID == id).ToListAsync();
+                if (relatedScenarioDetails.Any()) _context.ScenarioDetails.RemoveRange(relatedScenarioDetails);
+
                 _context.Budgets.Remove(existing);
                 await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                string budgetLabel = $"{existing.Department?.DepartmentName} - {existing.Category} (₱{existing.Amount:N2})";
 
                 // Audit: Allocation Deleted
                 await _auditLog.LogSystemAction(CurrentTenantID, CurrentUserID,
-                    "AllocationDeleted", $"Budget allocation #{id} deleted.",
+                    "AllocationDeleted",
+                    $"Budget allocation #{id} '{budgetLabel}' deleted along with {relatedForecasts.Count} forecast(s), {relatedExpenses.Count} expense(s), {relatedRequests.Count} request(s), {relatedScenarioDetails.Count} scenario detail(s).",
                     HttpContext.Connection.RemoteIpAddress?.ToString());
+
+                TempData["Success"] = "Budget allocation and all related records deleted successfully.";
             }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                TempData["Error"] = $"Failed to delete budget allocation: {ex.Message}";
+            }
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -353,12 +404,23 @@ namespace FinSight.Controllers
 
             // Resolve the Budget to get DepartmentID and validate remaining budget
             int tenantId = CurrentTenantID!.Value;
+            int? departmentHeadDepartmentId = await GetCurrentDepartmentHeadDepartmentIdAsync();
+            if (!departmentHeadDepartmentId.HasValue)
+            {
+                TempData["Error"] = "Your account is not assigned to a department. Please contact your administrator.";
+                return RedirectToAction(nameof(Index));
+            }
+
             var budget = await _context.Budgets
-                .FirstOrDefaultAsync(b => b.BudgetID == BudgetID && b.TenantID == tenantId);
+                .FirstOrDefaultAsync(b =>
+                    b.BudgetID == BudgetID &&
+                    b.TenantID == tenantId &&
+                    b.DepartmentID == departmentHeadDepartmentId.Value &&
+                    b.Status == "Active");
 
             if (budget == null)
             {
-                TempData["Error"] = "Selected budget allocation was not found.";
+                TempData["Error"] = "Selected active budget allocation was not found for your department.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -414,6 +476,20 @@ namespace FinSight.Controllers
 
             TempData["Success"] = "Budget request submitted successfully.";
             return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<int?> GetCurrentDepartmentHeadDepartmentIdAsync()
+        {
+            if (!IsDeptHead || CurrentUserID == null)
+                return null;
+
+            if (CurrentDepartmentID.HasValue)
+                return CurrentDepartmentID.Value;
+
+            return await _context.Users
+                .Where(u => u.UserID == CurrentUserID.Value && !u.IsArchived)
+                .Select(u => u.DepartmentID)
+                .FirstOrDefaultAsync();
         }
     }
 }

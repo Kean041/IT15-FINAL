@@ -39,6 +39,34 @@ namespace FinSight.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task CreateTenantBroadcastAsync(int tenantId, string type, string title, string message, string? redirectUrl = null)
+        {
+            if (tenantId <= 0) return;
+
+            var userIds = await _context.Users
+                .Where(u => u.TenantID == tenantId && !u.IsArchived)
+                .Select(u => u.UserID)
+                .ToListAsync();
+
+            if (!userIds.Any()) return;
+
+            var now = DateTime.Now;
+            var notifications = userIds.Select(userId => new Notification
+            {
+                TenantID = tenantId,
+                UserID = userId,
+                NotificationType = type,
+                Title = title,
+                Message = message,
+                RedirectUrl = redirectUrl,
+                CreatedAt = now,
+                IsRead = false
+            });
+
+            _context.Notifications.AddRange(notifications);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<int> GetUnreadCountAsync(int? tenantId, int? userId, int roleId)
         {
             var query = _context.Notifications.AsQueryable();

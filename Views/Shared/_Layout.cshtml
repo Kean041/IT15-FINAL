@@ -634,6 +634,12 @@
                         <i class="bi bi-cash-stack"></i> Budget Allocation
                     </a>
                 </li>
+                @* Actual Expenses: All roles can view *@
+                <li>
+                    <a asp-controller="Expenses" asp-action="Index">
+                        <i class="bi bi-receipt"></i> Actual Expenses
+                    </a>
+                </li>
                 @* Financial Forecasting: Finance Manager, Admin, SuperAdmin only *@
                 @if (roleId == 0 || roleId == 1 || roleId == 2)
                 {

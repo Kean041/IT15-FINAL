@@ -8,6 +8,39 @@ namespace FinSight.Data
 {
     public static class DbInitializer
     {
+        public static async Task EnsureExpenseSchemaAsync(FinSightDbContext context, ILogger logger)
+        {
+            // Repair older/manual Expenses tables that existed before the expense module
+            // was completed. EF expects these columns when listing expenses.
+            logger.LogInformation("Ensuring Expenses table has required module columns...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('Expenses', 'U') IS NOT NULL
+                BEGIN
+                    IF COL_LENGTH('Expenses', 'CreatedBy') IS NULL
+                    BEGIN
+                        DECLARE @DefaultExpenseUserID INT;
+                        SELECT TOP 1 @DefaultExpenseUserID = UserID
+                        FROM Users
+                        ORDER BY CASE WHEN Email = 'superadmin@system.com' THEN 0 ELSE 1 END, UserID;
+
+                        ALTER TABLE Expenses ADD CreatedBy INT NOT NULL DEFAULT (0);
+
+                        IF @DefaultExpenseUserID IS NOT NULL
+                            UPDATE Expenses SET CreatedBy = @DefaultExpenseUserID WHERE CreatedBy = 0;
+                    END
+
+                    IF COL_LENGTH('Expenses', 'Year') IS NULL
+                    BEGIN
+                        ALTER TABLE Expenses ADD [Year] INT NOT NULL DEFAULT (YEAR(GETDATE()));
+
+                        IF COL_LENGTH('Expenses', 'ExpenseDate') IS NOT NULL
+                            UPDATE Expenses SET [Year] = YEAR(ExpenseDate);
+                    END
+                END");
+
+            logger.LogInformation("Expenses schema repair complete.");
+        }
+
         public static async Task InitializeAsync(FinSightDbContext context, ILogger logger, IConfiguration configuration)
         {
             try
@@ -64,30 +97,7 @@ namespace FinSight.Data
                     logger.LogInformation("Super Admin already exists. Skipping seed.");
                 }
 
-                // 2. Ensure Expenses table exists (created outside EF migrations)
-                logger.LogInformation("Checking for Expenses table...");
-                await context.Database.ExecuteSqlRawAsync(@"
-                    IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Expenses')
-                    BEGIN
-                        CREATE TABLE Expenses (
-                            ExpenseID INT IDENTITY(1,1) PRIMARY KEY,
-                            BudgetID INT NOT NULL,
-                            DepartmentID INT NOT NULL,
-                            TenantID INT NOT NULL,
-                            Description NVARCHAR(255) NOT NULL,
-                            Amount DECIMAL(18,2) NOT NULL,
-                            Year INT NOT NULL,
-                            CreatedBy INT NOT NULL,
-                            CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
-                            CONSTRAINT FK_Expenses_Budgets FOREIGN KEY (BudgetID) REFERENCES Budgets(BudgetID),
-                            CONSTRAINT FK_Expenses_Departments FOREIGN KEY (DepartmentID) REFERENCES Departments(DepartmentID),
-                            CONSTRAINT FK_Expenses_Tenants FOREIGN KEY (TenantID) REFERENCES Tenants(TenantID),
-                            CONSTRAINT FK_Expenses_Users FOREIGN KEY (CreatedBy) REFERENCES Users(UserID)
-                        );
-                        PRINT 'Expenses table created successfully.';
-                    END
-                ");
-                logger.LogInformation("Expenses table check complete.");
+                await EnsureExpenseSchemaAsync(context, logger);
             }
             catch (Exception ex)
             {

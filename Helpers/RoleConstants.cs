@@ -130,5 +130,16 @@ namespace FinSight.Helpers
                 || roleId == FinanceManager
                 || roleId == DepartmentHead;
         }
+
+        /// <summary>
+        /// Returns true if the role can create/edit official expense records.
+        /// Only Finance Managers, Admins, and Super Admins can manage expenses.
+        /// </summary>
+        public static bool CanManageExpenses(int roleId)
+        {
+            return roleId == SuperAdmin
+                || roleId == Admin
+                || roleId == FinanceManager;
+        }
     }
 }

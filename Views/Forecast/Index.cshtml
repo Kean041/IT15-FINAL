@@ -384,11 +384,10 @@
                                                     onclick="openEditModal(@item.ForecastID, @item.BudgetID, '@item.ForecastType.Replace("'", "\\'")', @item.PredictedAmount.ToString(System.Globalization.CultureInfo.InvariantCulture), @item.Year)">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
-                                            <form asp-action="Delete" asp-route-id="@item.ForecastID" method="post" class="m-0 p-0" onsubmit="return confirm('Delete this forecast?');">
-                                                <button type="submit" class="btn btn-sm btn-soft-danger">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-soft-danger"
+                                                    onclick="openDeleteModal(@item.ForecastID, '@item.Department?.DepartmentName?.Replace("'", "\\'")', '@item.ForecastType.Replace("'", "\\'")')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -462,6 +461,28 @@
                     <button type="submit" class="btn btn-turquoise shadow-sm px-4">Save Forecast</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE CONFIRMATION MODAL -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-body p-4 text-center">
+                <i class="bi bi-exclamation-triangle" style="font-size:3.5rem;color:var(--danger);"></i>
+                <h5 class="fw-bold mt-3 mb-2" style="color:var(--navy);">Delete Forecast</h5>
+                <p class="text-muted small mb-4">Are you sure you want to delete the <strong id="deleteForecastType"></strong> forecast for <strong id="deleteForecastDept"></strong>? This action cannot be undone.</p>
+                <form id="deleteForm" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-light flex-grow-1 fw-medium" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-soft-danger flex-grow-1 fw-medium">
+                            <i class="bi bi-trash me-1"></i> Delete
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -653,6 +674,14 @@
         document.getElementById('editYear').value = year;
 
         var modal = new bootstrap.Modal(document.getElementById('editModal'));
+        modal.show();
+    }
+
+    function openDeleteModal(forecastId, deptName, forecastType) {
+        document.getElementById('deleteForm').action = '/Forecast/Delete/' + forecastId;
+        document.getElementById('deleteForecastDept').innerText = deptName || 'this department';
+        document.getElementById('deleteForecastType').innerText = forecastType || 'Base Case';
+        var modal = new bootstrap.Modal(document.getElementById('deleteModal'));
         modal.show();
     }
 </script>

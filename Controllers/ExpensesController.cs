@@ -1,0 +1,630 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Data;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
+using FinSight.Data;
+using FinSight.Models;
+using FinSight.Helpers;
+
+namespace FinSight.Controllers
+{
+    public class ExpensesController : BaseController
+    {
+        private readonly FinSightDbContext _db;
+
+        public ExpensesController(FinSightDbContext db)
+        {
+            _db = db;
+        }
+
+        // ─────────────────────────────────────────────
+        // RBAC helpers
+        // ─────────────────────────────────────────────
+        private bool CanManage => CurrentRoleID != null && Roles.CanManageExpenses(CurrentRoleID.Value);
+
+        // ─────────────────────────────────────────────
+        // GET: Expenses
+        // ─────────────────────────────────────────────
+        public async Task<IActionResult> Index(int? departmentId, string? status, DateTime? startDate, DateTime? endDate, string? search, int page = 1)
+        {
+            if (!IsAuthenticated) return RedirectToLogin();
+
+            var roleId = CurrentRoleID ?? Roles.DepartmentHead;
+            var tenantFilter = GetTenantFilter();
+
+            var query = _db.Expenses
+                .Include(e => e.Budget)
+                .Include(e => e.Department)
+                .Include(e => e.BudgetRequest)
+                .AsQueryable();
+
+            if (tenantFilter != null)
+                query = query.Where(e => e.TenantID == tenantFilter.Value);
+
+            // Department Head can only see own department
+            if (roleId == Roles.DepartmentHead)
+            {
+                var userDept = HttpContext.Session.GetInt32("DepartmentID");
+                if (userDept != null)
+                    query = query.Where(e => e.DepartmentID == userDept.Value);
+            }
+            else if (departmentId.HasValue && departmentId.Value > 0)
+            {
+                query = query.Where(e => e.DepartmentID == departmentId.Value);
+            }
+
+            if (!string.IsNullOrEmpty(status))
+                query = query.Where(e => e.Status == status);
+
+            if (startDate.HasValue)
+                query = query.Where(e => e.ExpenseDate >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(e => e.ExpenseDate <= endDate.Value);
+
+            if (!string.IsNullOrEmpty(search))
+                query = query.Where(e => e.ExpenseTitle.Contains(search) || e.Category.Contains(search) || e.Description.Contains(search));
+
+            // ── KPI Calculations ──
+            var totalExpenses = await query.SumAsync(e => (decimal?)e.Amount) ?? 0m;
+            var totalCount = await query.CountAsync();
+
+            // Monthly expenses (current month)
+            var now = DateTime.Now;
+            var monthlyExpenses = await query
+                .Where(e => e.ExpenseDate.Year == now.Year && e.ExpenseDate.Month == now.Month)
+                .SumAsync(e => (decimal?)e.Amount) ?? 0m;
+
+            // Remaining budget across all linked budgets
+            var budgetIds = await query.Select(e => e.BudgetID).Distinct().ToListAsync();
+            var totalAllocated = 0m;
+            var totalSpent = 0m;
+            if (budgetIds.Any())
+            {
+                totalAllocated = await _db.Budgets
+                    .Where(b => budgetIds.Contains(b.BudgetID))
+                    .SumAsync(b => (decimal?)b.Amount) ?? 0m;
+
+                totalSpent = await _db.Expenses
+                    .Where(e => budgetIds.Contains(e.BudgetID))
+                    .SumAsync(e => (decimal?)e.Amount) ?? 0m;
+            }
+            var remainingBudget = totalAllocated - totalSpent;
+
+            // ── Pagination ──
+            int pageSize = 15;
+            if (page < 1) page = 1;
+
+            // Keep pagination in memory for compatibility with older SQL Server versions
+            // that reject EF Core's OFFSET/FETCH SQL.
+            var filteredItems = await query
+                .OrderByDescending(e => e.ExpenseDate)
+                .ThenByDescending(e => e.ExpenseID)
+                .ToListAsync();
+
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            if (totalPages == 0) totalPages = 1;
+            if (page > totalPages) page = totalPages;
+
+            var items = filteredItems
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            ViewBag.TotalExpenses = totalExpenses;
+            ViewBag.MonthlyExpenses = monthlyExpenses;
+            ViewBag.RemainingBudget = remainingBudget;
+            ViewBag.TotalAllocated = totalAllocated;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            ViewBag.TotalCount = totalCount;
+            ViewBag.RoleID = roleId;
+            ViewBag.CanManage = CanManage;
+
+            // Preserve filter values
+            ViewBag.CurrentDepartment = departmentId;
+            ViewBag.CurrentStatus = status;
+            ViewBag.CurrentStartDate = startDate?.ToString("yyyy-MM-dd");
+            ViewBag.CurrentEndDate = endDate?.ToString("yyyy-MM-dd");
+            ViewBag.CurrentSearch = search;
+
+            if (roleId != Roles.DepartmentHead)
+            {
+                var depts = await _db.Departments
+                    .Where(d => tenantFilter == null || d.TenantID == tenantFilter)
+                    .OrderBy(d => d.DepartmentName)
+                    .ToListAsync();
+                ViewBag.Departments = new SelectList(depts, "DepartmentID", "DepartmentName", departmentId);
+            }
+
+            return View(items);
+        }
+
+        // ─────────────────────────────────────────────
+        // GET: Expenses/Create
+        // ─────────────────────────────────────────────
+        public async Task<IActionResult> Create()
+        {
+            if (!IsAuthenticated) return RedirectToLogin();
+            if (!CanManage) return AccessDenied();
+
+            await PopulateBudgetDropdown(null);
+            return View();
+        }
+
+        // ─────────────────────────────────────────────
+        // POST: Expenses/Create
+        // ─────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(Expense model)
+        {
+            if (!IsAuthenticated) return RedirectToLogin();
+            if (!CanManage) return AccessDenied();
+
+            var tenantFilter = GetTenantFilter();
+
+            // Clear validation state for system-assigned properties not in the form
+            ModelState.Remove("DepartmentID");
+            ModelState.Remove("TenantID");
+            ModelState.Remove("Year");
+            ModelState.Remove("CreatedBy");
+            ModelState.Remove("Status");
+
+            if (ModelState.IsValid)
+            {
+                var budget = await _db.Budgets
+                    .Include(b => b.Department)
+                    .FirstOrDefaultAsync(b =>
+                        b.BudgetID == model.BudgetID &&
+                        (tenantFilter == null || b.TenantID == tenantFilter.Value) &&
+                        b.Status == "Active");
+
+                if (budget == null)
+                {
+                    ModelState.AddModelError("BudgetID", "Selected approved budget allocation does not exist.");
+                }
+                else
+                {
+                    var linkedRequest = await ValidateLinkedRequestAsync(model.BudgetRequestID, budget.BudgetID, budget.TenantID);
+                    if (model.BudgetRequestID.HasValue && linkedRequest == null)
+                    {
+                        ModelState.AddModelError("BudgetRequestID", "Selected budget request is not approved for this allocation.");
+                    }
+
+                    ApplyRequestDefaults(model, linkedRequest, budget);
+
+                    await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+                    var remaining = await GetRemainingBudgetAsync(budget.BudgetID);
+
+                    if (model.Amount > remaining || remaining < 0)
+                    {
+                        ModelState.AddModelError("Amount", "Expense amount exceeds the remaining allocated budget.");
+                        ModelState.AddModelError("Amount",
+                            $"Expense amount (₱{model.Amount:N2}) exceeds remaining budget (₱{remaining:N2}).");
+
+                        // Security log for budget overrun attempt
+                        _db.AuditLogs.Add(new AuditLog
+                        {
+                            UserID = CurrentUserID,
+                            TenantID = tenantFilter ?? budget.TenantID,
+                            LogType = "Security",
+                            Severity = "Warning",
+                            Action = "Budget Overrun Attempt",
+                            Details = $"User '{CurrentFullName}' attempted expense of ₱{model.Amount:N2} on budget '{budget.Category}' (ID:{budget.BudgetID}). Remaining: ₱{remaining:N2}.",
+                            IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                        });
+                        await _db.SaveChangesAsync();
+                        await tx.CommitAsync();
+                    }
+                    else if (ModelState.IsValid)
+                    {
+                        model.TenantID = budget.TenantID;
+                        model.DepartmentID = budget.DepartmentID;
+                        model.CreatedBy = CurrentUserID ?? 0;
+                        model.CreatedAt = DateTime.Now;
+                        model.Year = budget.Year;
+                        model.Status = "Recorded";
+
+                        _db.Expenses.Add(model);
+
+                        // Audit Log
+                        _db.AuditLogs.Add(new AuditLog
+                        {
+                            UserID = CurrentUserID,
+                            TenantID = tenantFilter ?? budget.TenantID,
+                            Action = "Expense Created",
+                            Details = $"Recorded expense '{model.ExpenseTitle}' for ₱{model.Amount:N2} against budget '{budget.Category}' ({budget.Department?.DepartmentName}).",
+                            IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                        });
+
+                        // Notification
+                        _db.Notifications.Add(new Notification
+                        {
+                            TenantID = budget.TenantID,
+                            Title = "New Expense Recorded",
+                            Message = $"₱{model.Amount:N2} expense '{model.ExpenseTitle}' recorded against {budget.Department?.DepartmentName} budget.",
+                            NotificationType = "System",
+                            RedirectUrl = "/Expenses"
+                        });
+
+                        await _db.SaveChangesAsync();
+                        await tx.CommitAsync();
+
+                        TempData["Success"] = "Expense recorded successfully.";
+                        return RedirectToAction(nameof(Index));
+                    }
+                }
+            }
+
+            await PopulateBudgetDropdown(model.BudgetID);
+            return View(model);
+        }
+
+        // ─────────────────────────────────────────────
+        // GET: Expenses/Edit/5
+        // ─────────────────────────────────────────────
+        public async Task<IActionResult> Edit(int id)
+        {
+            if (!IsAuthenticated) return RedirectToLogin();
+            if (!CanManage) return AccessDenied();
+
+            var tenantFilter = GetTenantFilter();
+            var expense = await _db.Expenses
+                .Include(e => e.Budget)
+                .Include(e => e.Department)
+                .FirstOrDefaultAsync(e => e.ExpenseID == id && (tenantFilter == null || e.TenantID == tenantFilter));
+
+            if (expense == null) return NotFound();
+            if (expense.Status == "Archived")
+            {
+                TempData["Error"] = "Archived expenses cannot be edited.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            await PopulateBudgetDropdown(expense.BudgetID);
+
+            // Load budget details for the info panel
+            var spent = await _db.Expenses
+                .Where(e => e.BudgetID == expense.BudgetID && e.ExpenseID != expense.ExpenseID)
+                .SumAsync(e => (decimal?)e.Amount) ?? 0m;
+            ViewBag.BudgetTotal = expense.Budget?.Amount ?? 0;
+            ViewBag.BudgetUsed = spent;
+            ViewBag.BudgetRemaining = (expense.Budget?.Amount ?? 0) - spent;
+
+            return View(expense);
+        }
+
+        // ─────────────────────────────────────────────
+        // POST: Expenses/Edit/5
+        // ─────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, Expense model)
+        {
+            if (!IsAuthenticated) return RedirectToLogin();
+            if (!CanManage) return AccessDenied();
+
+            var tenantFilter = GetTenantFilter();
+            var existing = await _db.Expenses
+                .FirstOrDefaultAsync(e => e.ExpenseID == id && (tenantFilter == null || e.TenantID == tenantFilter));
+
+            if (existing == null) return NotFound();
+            if (existing.Status == "Archived")
+            {
+                TempData["Error"] = "Archived expenses cannot be edited.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            // Clear validation state for system-assigned properties not in the form
+            ModelState.Remove("DepartmentID");
+            ModelState.Remove("TenantID");
+            ModelState.Remove("Year");
+            ModelState.Remove("CreatedBy");
+            ModelState.Remove("Status");
+
+            if (ModelState.IsValid)
+            {
+                var budget = await _db.Budgets
+                    .FirstOrDefaultAsync(b =>
+                        b.BudgetID == model.BudgetID &&
+                        (tenantFilter == null || b.TenantID == tenantFilter.Value) &&
+                        b.Status == "Active");
+                if (budget == null)
+                {
+                    ModelState.AddModelError("BudgetID", "Selected approved budget allocation does not exist.");
+                }
+                else
+                {
+                    var linkedRequest = await ValidateLinkedRequestAsync(model.BudgetRequestID, budget.BudgetID, budget.TenantID);
+                    if (model.BudgetRequestID.HasValue && linkedRequest == null)
+                    {
+                        ModelState.AddModelError("BudgetRequestID", "Selected budget request is not approved for this allocation.");
+                    }
+
+                    ApplyRequestDefaults(model, linkedRequest, budget);
+
+                    await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+                    var remaining = await GetRemainingBudgetAsync(budget.BudgetID, id);
+
+                    if (model.Amount > remaining || remaining < 0)
+                    {
+                        ModelState.AddModelError("Amount", "Expense amount exceeds the remaining allocated budget.");
+                        ModelState.AddModelError("Amount",
+                            $"Expense amount (₱{model.Amount:N2}) exceeds remaining budget (₱{remaining:N2}).");
+
+                        _db.AuditLogs.Add(new AuditLog
+                        {
+                            UserID = CurrentUserID,
+                            TenantID = tenantFilter ?? existing.TenantID,
+                            LogType = "Security",
+                            Severity = "Warning",
+                            Action = "Budget Overrun Attempt",
+                            Details = $"User '{CurrentFullName}' attempted to update expense #{id} to ₱{model.Amount:N2}. Remaining: ₱{remaining:N2}.",
+                            IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                        });
+                        await _db.SaveChangesAsync();
+                        await tx.CommitAsync();
+                    }
+                    else if (ModelState.IsValid)
+                    {
+                        var oldAmount = existing.Amount;
+
+                        existing.BudgetID = model.BudgetID;
+                        existing.BudgetRequestID = model.BudgetRequestID;
+                        existing.ExpenseTitle = model.ExpenseTitle;
+                        existing.Category = model.Category;
+                        existing.Description = model.Description;
+                        existing.Amount = model.Amount;
+                        existing.ExpenseDate = model.ExpenseDate;
+                        existing.DepartmentID = budget.DepartmentID;
+                        existing.Year = budget.Year;
+
+                        _db.AuditLogs.Add(new AuditLog
+                        {
+                            UserID = CurrentUserID,
+                            TenantID = tenantFilter ?? existing.TenantID,
+                            Action = "Expense Updated",
+                            Details = $"Updated expense '{existing.ExpenseTitle}' (ID:{id}). Amount changed from ₱{oldAmount:N2} to ₱{model.Amount:N2}.",
+                            IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                        });
+
+                        _db.Notifications.Add(new Notification
+                        {
+                            TenantID = existing.TenantID,
+                            Title = "Expense Updated",
+                            Message = $"Expense '{existing.ExpenseTitle}' updated to ₱{model.Amount:N2}.",
+                            NotificationType = "System",
+                            RedirectUrl = "/Expenses"
+                        });
+
+                        await _db.SaveChangesAsync();
+                        await tx.CommitAsync();
+                        TempData["Success"] = "Expense updated successfully.";
+                        return RedirectToAction(nameof(Index));
+                    }
+                }
+            }
+
+            await PopulateBudgetDropdown(model.BudgetID);
+            return View(model);
+        }
+
+        // ─────────────────────────────────────────────
+        // POST: Expenses/UpdateStatus
+        // ─────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateStatus(int id, string newStatus)
+        {
+            if (!IsAuthenticated) return RedirectToLogin();
+            if (!CanManage) return AccessDenied();
+
+            var tenantFilter = GetTenantFilter();
+            var expense = await _db.Expenses
+                .Include(e => e.Department)
+                .FirstOrDefaultAsync(e => e.ExpenseID == id && (tenantFilter == null || e.TenantID == tenantFilter));
+
+            if (expense == null) return NotFound();
+
+            var validStatuses = new[] { "Recorded", "Verified", "Archived" };
+            if (!validStatuses.Contains(newStatus))
+                return BadRequest("Invalid status.");
+
+            var oldStatus = expense.Status;
+            expense.Status = newStatus;
+
+            _db.AuditLogs.Add(new AuditLog
+            {
+                UserID = CurrentUserID,
+                TenantID = tenantFilter ?? expense.TenantID,
+                Action = newStatus == "Archived" ? "Expense Archived" : "Expense Updated",
+                Details = $"Expense '{expense.ExpenseTitle}' (ID:{id}) status changed from '{oldStatus}' to '{newStatus}'.",
+                IPAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+            });
+
+            _db.Notifications.Add(new Notification
+            {
+                TenantID = expense.TenantID,
+                Title = $"Expense {newStatus}",
+                Message = $"Expense '{expense.ExpenseTitle}' ({expense.Department?.DepartmentName}) has been {newStatus.ToLower()}.",
+                NotificationType = "System",
+                RedirectUrl = "/Expenses"
+            });
+
+            await _db.SaveChangesAsync();
+
+            TempData["Success"] = $"Expense status updated to {newStatus}.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // ─────────────────────────────────────────────
+        // AJAX: Get approved requests by budget
+        // ─────────────────────────────────────────────
+        [HttpGet]
+        public async Task<IActionResult> GetRequestsByBudget(int budgetId)
+        {
+            if (!IsAuthenticated) return Unauthorized();
+
+            var tenantFilter = GetTenantFilter();
+            var requests = await _db.BudgetRequests
+                .Include(r => r.Department)
+                .Include(r => r.Budget)
+                .Where(r =>
+                    r.BudgetID == budgetId &&
+                    r.Status == "Approved" &&
+                    (tenantFilter == null || r.TenantID == tenantFilter.Value))
+                .Select(r => new
+                {
+                    r.RequestID,
+                    r.Title,
+                    r.Description,
+                    r.RequestedAmount,
+                    r.BudgetID,
+                    Department = r.Department != null ? r.Department.DepartmentName : "",
+                    Category = r.Budget != null ? r.Budget.Category : ""
+                })
+                .ToListAsync();
+
+            return Json(requests);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetRequestDetails(int requestId)
+        {
+            if (!IsAuthenticated) return Unauthorized();
+
+            var tenantFilter = GetTenantFilter();
+            var request = await _db.BudgetRequests
+                .Include(r => r.Department)
+                .Include(r => r.Budget)
+                .FirstOrDefaultAsync(r =>
+                    r.RequestID == requestId &&
+                    r.Status == "Approved" &&
+                    (tenantFilter == null || r.TenantID == tenantFilter.Value));
+
+            if (request == null) return NotFound();
+
+            return Json(new
+            {
+                request.RequestID,
+                request.Title,
+                request.Description,
+                request.RequestedAmount,
+                request.BudgetID,
+                Department = request.Department?.DepartmentName ?? "",
+                Category = request.Budget?.Category ?? ""
+            });
+        }
+
+        // ─────────────────────────────────────────────
+        // AJAX: Get budget details
+        // ─────────────────────────────────────────────
+        [HttpGet]
+        public async Task<IActionResult> GetBudgetDetails(int budgetId, int? excludeExpenseId = null)
+        {
+            if (!IsAuthenticated) return Unauthorized();
+
+            var tenantFilter = GetTenantFilter();
+            var budget = await _db.Budgets
+                .Include(b => b.Department)
+                .FirstOrDefaultAsync(b =>
+                    b.BudgetID == budgetId &&
+                    (tenantFilter == null || b.TenantID == tenantFilter.Value) &&
+                    b.Status == "Active");
+            if (budget == null) return NotFound();
+
+            var expenseQuery = _db.Expenses.Where(e => e.BudgetID == budgetId);
+            if (excludeExpenseId.HasValue)
+                expenseQuery = expenseQuery.Where(e => e.ExpenseID != excludeExpenseId.Value);
+
+            var totalExpenses = await expenseQuery.SumAsync(e => (decimal?)e.Amount) ?? 0m;
+
+            var remaining = budget.Amount - totalExpenses;
+            var utilization = budget.Amount > 0
+                ? Math.Round((totalExpenses / budget.Amount) * 100m, 1)
+                : 0m;
+            var indicator = "healthy";
+            if (remaining < 0 || utilization >= 90)
+                indicator = "danger";
+            else if (utilization >= 70)
+                indicator = "warning";
+
+            return Json(new
+            {
+                Total = budget.Amount,
+                Used = totalExpenses,
+                Remaining = remaining,
+                Utilization = utilization,
+                Indicator = indicator,
+                Department = budget.Department?.DepartmentName ?? "N/A",
+                Category = budget.Category,
+                Year = budget.Year
+            });
+        }
+
+        // ─────────────────────────────────────────────
+        // Helper: Populate budget dropdown
+        // ─────────────────────────────────────────────
+        private async Task PopulateBudgetDropdown(int? selectedBudgetId)
+        {
+            var tenantFilter = GetTenantFilter();
+            var budgets = await _db.Budgets
+                .Include(b => b.Department)
+                .Where(b => (tenantFilter == null || b.TenantID == tenantFilter) && b.Status == "Active")
+                .Select(b => new
+                {
+                    b.BudgetID,
+                    DisplayText = b.Department!.DepartmentName + " - " + b.Category + " (" + b.Year + ")"
+                })
+                .ToListAsync();
+
+            ViewBag.BudgetID = new SelectList(budgets, "BudgetID", "DisplayText", selectedBudgetId);
+        }
+
+        private async Task<decimal> GetRemainingBudgetAsync(int budgetId, int? excludeExpenseId = null)
+        {
+            var budgetAmount = await _db.Budgets
+                .Where(b => b.BudgetID == budgetId)
+                .Select(b => b.Amount)
+                .FirstAsync();
+
+            var expenseQuery = _db.Expenses.Where(e => e.BudgetID == budgetId);
+            if (excludeExpenseId.HasValue)
+                expenseQuery = expenseQuery.Where(e => e.ExpenseID != excludeExpenseId.Value);
+
+            var spent = await expenseQuery.SumAsync(e => (decimal?)e.Amount) ?? 0m;
+            return budgetAmount - spent;
+        }
+
+        private async Task<BudgetRequest?> ValidateLinkedRequestAsync(int? requestId, int budgetId, int tenantId)
+        {
+            if (!requestId.HasValue) return null;
+
+            return await _db.BudgetRequests
+                .Include(r => r.Budget)
+                .FirstOrDefaultAsync(r =>
+                    r.RequestID == requestId.Value &&
+                    r.BudgetID == budgetId &&
+                    r.TenantID == tenantId &&
+                    r.Status == "Approved");
+        }
+
+        private static void ApplyRequestDefaults(Expense model, BudgetRequest? request, Budget budget)
+        {
+            if (request == null) return;
+
+            if (string.IsNullOrWhiteSpace(model.ExpenseTitle))
+                model.ExpenseTitle = request.Title;
+
+            if (string.IsNullOrWhiteSpace(model.Category))
+                model.Category = budget.Category;
+
+            if (string.IsNullOrWhiteSpace(model.Description) && !string.IsNullOrWhiteSpace(request.Description))
+                model.Description = request.Description;
+        }
+    }
+}

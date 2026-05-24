@@ -83,11 +83,11 @@ namespace FinSight.Data
                 .HasForeignKey(e => e.DepartmentID)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Expense → User (no cascade)
+            // Expense → BudgetRequest (no cascade)
             modelBuilder.Entity<Expense>()
-                .HasOne(e => e.Creator)
+                .HasOne(e => e.BudgetRequest)
                 .WithMany()
-                .HasForeignKey(e => e.CreatedBy)
+                .HasForeignKey(e => e.BudgetRequestID)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // ── BudgetRequest relationships ──────────────
