@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Stripe;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +58,9 @@ var app = builder.Build();
 
 // Configure Stripe API Key
 StripeConfiguration.ApiKey = builder.Configuration.GetSection("Stripe")["SecretKey"];
+
+// Configure QuestPDF License
+QuestPDF.Settings.License = LicenseType.Community;
 
 // ----- SEED DATABASE -----
 using (var scope = app.Services.CreateScope())

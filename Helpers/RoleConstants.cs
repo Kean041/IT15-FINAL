@@ -141,5 +141,18 @@ namespace FinSight.Helpers
                 || roleId == Admin
                 || roleId == FinanceManager;
         }
+
+        /// <summary>
+        /// Returns true if the role can access the Reports module.
+        /// All roles have at least partial access; DeptHead sees only their department data.
+        /// </summary>
+        public static bool CanAccessReports(int roleId)
+        {
+            return roleId == SuperAdmin
+                || roleId == Admin
+                || roleId == FinanceManager
+                || roleId == Executive
+                || roleId == DepartmentHead;
+        }
     }
 }

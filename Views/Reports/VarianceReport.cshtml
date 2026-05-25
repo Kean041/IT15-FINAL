@@ -1,0 +1,89 @@
+@model FinSight.Models.ViewModels.VarianceReportViewModel
+
+@{
+    ViewData["Title"] = "Variance Analysis Report";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="mb-1 fw-bold text-dark">Variance Analysis</h3>
+        <p class="text-muted mb-0">Compare budgets, actual spending, and forecasted amounts for @Model.Year.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                @for (int i = DateTime.Now.Year - 2; i <= DateTime.Now.Year + 2; i++)
+                {
+                    <option value="@i" selected="@(i == Model.Year)">@i</option>
+                }
+            </select>
+        </form>
+        <a href="@Url.Action("VarianceReport", new { year = Model.Year, export = "pdf" })" class="btn btn-sm btn-primary d-flex align-items-center gap-2" style="border-radius:8px;">
+            <i class="bi bi-file-earmark-pdf"></i> Export PDF
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="border-radius:12px;">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="text-muted fw-semibold ps-4">Department</th>
+                        <th class="text-muted fw-semibold">Category</th>
+                        <th class="text-muted fw-semibold">Budgeted</th>
+                        <th class="text-muted fw-semibold">Actuals</th>
+                        <th class="text-muted fw-semibold">Forecast</th>
+                        <th class="text-muted fw-semibold">Variance</th>
+                        <th class="text-muted fw-semibold pe-4">Variance %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Variances.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                No variance data found for @Model.Year
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var item in Model.Variances.OrderBy(v => v.DepartmentName))
+                    {
+                        <tr>
+                            <td class="ps-4 fw-medium text-dark">@item.DepartmentName</td>
+                            <td class="text-muted small">@item.Category</td>
+                            <td>@item.BudgetedAmount.ToString("C")</td>
+                            <td>@item.ActualAmount.ToString("C")</td>
+                            <td class="text-muted">@item.ForecastedAmount.ToString("C")</td>
+                            <td class="fw-bold @(item.VarianceAmount < 0 ? "text-danger" : "text-success")">
+                                @item.VarianceAmount.ToString("C")
+                            </td>
+                            <td class="pe-4">
+                                @if (item.VariancePercentage < 0)
+                                {
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="border-radius:6px;">
+                                        <i class="bi bi-arrow-down me-1"></i> @Math.Abs(item.VariancePercentage).ToString("F1")%
+                                    </span>
+                                }
+                                else if (item.VariancePercentage > 0)
+                                {
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="border-radius:6px;">
+                                        <i class="bi bi-arrow-up me-1"></i> @item.VariancePercentage.ToString("F1")%
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25" style="border-radius:6px;">
+                                        0.0%
+                                    </span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

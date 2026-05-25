@@ -1,0 +1,77 @@
+@model FinSight.Models.ViewModels.AuditLogsReportViewModel
+
+@{
+    ViewData["Title"] = "Audit Logs Report";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="mb-1 fw-bold text-dark">Audit Logs</h3>
+        <p class="text-muted mb-0">System and security activity logs for monitoring and compliance.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2">
+            <input type="date" name="start" value="@Model.StartDate.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+            <span class="align-self-center text-muted">to</span>
+            <input type="date" name="end" value="@Model.EndDate.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+            <button type="submit" class="btn btn-sm btn-light border">Filter</button>
+        </form>
+        <a href="@Url.Action("AuditLogs", new { start = Model.StartDate.ToString("yyyy-MM-dd"), end = Model.EndDate.ToString("yyyy-MM-dd"), export = "pdf" })" class="btn btn-sm btn-primary d-flex align-items-center gap-2" style="border-radius:8px;">
+            <i class="bi bi-file-earmark-pdf"></i> Export PDF
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="border-radius:12px;">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="text-muted fw-semibold ps-4">Date & Time</th>
+                        <th class="text-muted fw-semibold">User</th>
+                        <th class="text-muted fw-semibold">Action</th>
+                        <th class="text-muted fw-semibold">Module</th>
+                        <th class="text-muted fw-semibold">Severity</th>
+                        <th class="text-muted fw-semibold pe-4">IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Logs.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                No audit logs found in this date range.
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var log in Model.Logs)
+                    {
+                        <tr>
+                            <td class="ps-4 text-muted small">@log.CreatedAt.ToString("MMM dd, yyyy HH:mm:ss")</td>
+                            <td class="fw-medium text-dark">@(log.User?.FullName ?? "System")</td>
+                            <td>@log.Action</td>
+                            <td>@log.LogType</td>
+                            <td>
+                                @if (log.Severity == "Critical")
+                                {
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="border-radius:6px;">@log.Severity</span>
+                                }
+                                else if (log.Severity == "Warning")
+                                {
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25" style="border-radius:6px;">@log.Severity</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" style="border-radius:6px;">@log.Severity</span>
+                                }
+                            </td>
+                            <td class="pe-4 text-muted small font-monospace">@(log.IPAddress ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

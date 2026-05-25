@@ -171,5 +171,9 @@ namespace FinSight.Controllers
         /// <summary>Can this role access Scenario Planning? (Finance Manager / Admin / SuperAdmin / DeptHead)</summary>
         protected bool CanAccessScenario =>
             CurrentRoleID != null && Roles.CanAccessScenario(CurrentRoleID.Value);
+
+        /// <summary>Can this role access Reports? (All authenticated roles)</summary>
+        protected bool CanAccessReports =>
+            CurrentRoleID != null && Roles.CanAccessReports(CurrentRoleID.Value);
     }
 }

@@ -675,6 +675,12 @@
                         <i class="bi bi-shield-check"></i> Approval Workflow
                     </a>
                 </li>
+                @* Reports: All roles can view *@
+                <li>
+                    <a asp-controller="Reports" asp-action="Index">
+                        <i class="bi bi-file-earmark-bar-graph"></i> Reports
+                    </a>
+                </li>
 
                 @* User Management: Super Admin and Admin only *@
                 @if (roleId == 0 || roleId == 1)

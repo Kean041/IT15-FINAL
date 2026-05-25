@@ -1,0 +1,85 @@
+@model FinSight.Models.ViewModels.BudgetRequestsReportViewModel
+
+@{
+    ViewData["Title"] = "Budget Requests Report";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="mb-1 fw-bold text-dark">Budget Requests</h3>
+        <p class="text-muted mb-0">Overview of supplemental budget requests for @Model.Year.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2">
+            <select name="status" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                <option value="">All Statuses</option>
+                <option value="Pending" selected="@(Model.StatusFilter == "Pending")">Pending</option>
+                <option value="Approved" selected="@(Model.StatusFilter == "Approved")">Approved</option>
+                <option value="Rejected" selected="@(Model.StatusFilter == "Rejected")">Rejected</option>
+            </select>
+            <select name="year" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                @for (int i = DateTime.Now.Year - 2; i <= DateTime.Now.Year + 2; i++)
+                {
+                    <option value="@i" selected="@(i == Model.Year)">@i</option>
+                }
+            </select>
+        </form>
+        <a href="@Url.Action("BudgetRequests", new { year = Model.Year, status = Model.StatusFilter, export = "pdf" })" class="btn btn-sm btn-primary d-flex align-items-center gap-2" style="border-radius:8px;">
+            <i class="bi bi-file-earmark-pdf"></i> Export PDF
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="border-radius:12px;">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="text-muted fw-semibold ps-4">Department</th>
+                        <th class="text-muted fw-semibold">Title</th>
+                        <th class="text-muted fw-semibold">Requested By</th>
+                        <th class="text-muted fw-semibold">Amount</th>
+                        <th class="text-muted fw-semibold">Needed By</th>
+                        <th class="text-muted fw-semibold pe-4">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Requests.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                No budget requests found.
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var item in Model.Requests)
+                    {
+                        <tr>
+                            <td class="ps-4 fw-medium text-dark">@(item.Department?.DepartmentName ?? "N/A")</td>
+                            <td>@item.Title</td>
+                            <td>@(item.Submitter?.FullName ?? "Unknown")</td>
+                            <td class="fw-bold">@item.RequestedAmount.ToString("C")</td>
+                            <td class="text-muted small">@item.DateNeeded.ToString("MMM dd, yyyy")</td>
+                            <td class="pe-4">
+                                @if (item.Status == "Approved")
+                                {
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="border-radius:6px;">@item.Status</span>
+                                }
+                                else if (item.Status == "Rejected")
+                                {
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" style="border-radius:6px;">@item.Status</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25" style="border-radius:6px;">@item.Status</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

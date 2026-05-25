@@ -1,0 +1,109 @@
+@model FinSight.Models.ViewModels.FinancialSummaryReportViewModel
+
+@{
+    ViewData["Title"] = "Financial Summary Report";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="mb-1 fw-bold text-dark">Financial Summary</h3>
+        <p class="text-muted mb-0">High-level view of budgets, expenses, and pending requests for @Model.Year.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                @for (int i = DateTime.Now.Year - 2; i <= DateTime.Now.Year + 2; i++)
+                {
+                    <option value="@i" selected="@(i == Model.Year)">@i</option>
+                }
+            </select>
+        </form>
+        <a href="@Url.Action("FinancialSummary", new { year = Model.Year, export = "pdf" })" class="btn btn-sm btn-primary d-flex align-items-center gap-2" style="border-radius:8px;">
+            <i class="bi bi-file-earmark-pdf"></i> Export PDF
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+            <div class="card-body p-4">
+                <p class="text-muted small fw-bold mb-1 text-uppercase tracking-wide">Total Budget</p>
+                <h4 class="fw-bold text-dark mb-0">@Model.TotalBudget.ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+            <div class="card-body p-4">
+                <p class="text-muted small fw-bold mb-1 text-uppercase tracking-wide">Total Expenses</p>
+                <h4 class="fw-bold text-danger mb-0">@Model.TotalExpenses.ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+            <div class="card-body p-4">
+                <p class="text-muted small fw-bold mb-1 text-uppercase tracking-wide">Remaining Budget</p>
+                <h4 class="fw-bold text-success mb-0">@Model.RemainingBudget.ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm" style="border-radius:12px;">
+            <div class="card-body p-4">
+                <p class="text-muted small fw-bold mb-1 text-uppercase tracking-wide">Pending Requests</p>
+                <h4 class="fw-bold text-warning mb-0">@Model.TotalPendingRequests.ToString("C")</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="border-radius:12px;">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="text-muted fw-semibold ps-4">Department</th>
+                        <th class="text-muted fw-semibold">Total Budget</th>
+                        <th class="text-muted fw-semibold">Total Expenses</th>
+                        <th class="text-muted fw-semibold">Pending Requests</th>
+                        <th class="text-muted fw-semibold pe-4">Utilization</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.DepartmentSummaries.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                No data found for @Model.Year
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var dept in Model.DepartmentSummaries)
+                    {
+                        <tr>
+                            <td class="ps-4 fw-medium text-dark">@dept.DepartmentName</td>
+                            <td>@dept.Budget.ToString("C")</td>
+                            <td>@dept.Expenses.ToString("C")</td>
+                            <td>@dept.PendingRequests.ToString("C")</td>
+                            <td class="pe-4">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span style="min-width:40px;">@dept.UtilizationPercentage.ToString("F1")%</span>
+                                    <div class="progress w-100" style="height:6px;">
+                                        @{
+                                            var color = dept.UtilizationPercentage > 90 ? "bg-danger" : dept.UtilizationPercentage > 75 ? "bg-warning" : "bg-success";
+                                        }
+                                        <div class="progress-bar @color" style="width: @Math.Min(100, dept.UtilizationPercentage)%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
