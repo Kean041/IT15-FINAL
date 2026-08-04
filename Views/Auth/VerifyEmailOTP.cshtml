@@ -1,0 +1,84 @@
+@model FinSight.Models.ViewModels.EmailMfaViewModel
+@{
+    Layout = "~/Views/Shared/_IdentityLayout.cshtml";
+    ViewData["Title"] = "Verify Email OTP";
+}
+
+<div class="auth-title"><i class="bi bi-envelope-check text-primary me-2"></i>Email Verification</div>
+<div class="auth-subtitle mb-4">We've sent a 6-digit verification code to your email (<strong>@Model.Email</strong>). The code will expire in 60 seconds.</div>
+
+<!-- Success Message -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success py-2 small mb-3" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i>@TempData["SuccessMessage"]
+    </div>
+}
+
+<!-- Error Message -->
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger py-2 small mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        @Html.ValidationSummary(false, "", new { @class = "mb-0" })
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger py-2 small mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>@TempData["ErrorMessage"]
+    </div>
+}
+
+<form asp-action="VerifyEmailOTP" asp-controller="Auth" method="post" id="otpForm">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-4">
+        <label asp-for="Code" class="form-label">Verification Code</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-123"></i></span>
+            <input asp-for="Code" class="form-control text-center font-monospace fs-4" style="letter-spacing: 0.5rem;" placeholder="------" maxlength="6" autocomplete="off" autofocus />
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
+        Verify Code <i class="bi bi-arrow-right ms-2"></i>
+    </button>
+</form>
+
+<form asp-action="ResendEmailOTP" asp-controller="Auth" method="post" id="resendForm">
+    @Html.AntiForgeryToken()
+    <div class="text-center small mb-4">
+        <span class="text-muted" id="timerText">Resend code in <strong id="countdown">01:00</strong></span>
+        <button type="submit" class="btn btn-link p-0 text-decoration-none d-none fw-bold" id="resendBtn">Resend Verification Code</button>
+    </div>
+</form>
+
+<div class="text-center small">
+    <a asp-action="Login" class="text-muted text-decoration-none"><i class="bi bi-arrow-left me-1"></i> Back to Login</a>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // 60 second countdown
+        let timeLeft = 60;
+        const countdownEl = document.getElementById('countdown');
+        const timerTextEl = document.getElementById('timerText');
+        const resendBtnEl = document.getElementById('resendBtn');
+
+        const timer = setInterval(() => {
+            timeLeft--;
+            
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                timerTextEl.classList.add('d-none');
+                resendBtnEl.classList.remove('d-none');
+            } else {
+                let minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+                countdownEl.innerText = `0${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+            }
+        }, 1000);
+    </script>
+}

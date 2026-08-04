@@ -419,7 +419,7 @@
                 <h5 class="modal-title fw-bold" id="createModalLabel"><i class="bi bi-wallet2 me-2"></i>Allocate New Budget</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form asp-action="Create" method="post">
+            <form asp-action="Create" method="post" id="createBudgetForm">
                 <div class="modal-body bg-offwhite p-4">
                     <p class="text-muted small mb-4">Use this form to officially allocate a new budget to a department. This will bypass the approval workflow and immediately make the funds available for the selected department and category.</p>
                     <div class="mb-3">
@@ -449,6 +449,10 @@
                     <div class="mb-3">
                         <label class="form-label fw-semibold text-secondary small">Status</label>
                         <select name="Status" asp-items="ViewBag.Statuses" class="form-select shadow-sm border-0" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Message (Optional)</label>
+                        <textarea name="Message" class="form-control shadow-sm border-0" rows="2" placeholder="Add a note or context for this allocation..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-0 bg-offwhite pt-0 pb-4 px-4">
@@ -514,12 +518,12 @@
                     <h5 class="modal-title fw-bold" id="submitRequestLabel"><i class="bi bi-send-plus me-2"></i>Submit Budget Request</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form asp-action="SubmitRequest" method="post">
+                <form asp-action="SubmitRequest" method="post" id="submitRequestForm">
                     <div class="modal-body bg-offwhite p-4">
                         <p class="text-muted small mb-4">Submit a formal request to Top Management to utilize your allocated funds. Please provide clear justification for the requested amount. Once submitted, this request will be routed to the Executive team for review and approval.</p>
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary small">Budget Allocation</label>
-                            <select name="BudgetID" asp-items="ViewBag.DeptBudgets" class="form-select shadow-sm border-0" required>
+                            <select name="BudgetID" id="reqBudgetID" asp-items="ViewBag.DeptBudgets" class="form-select shadow-sm border-0" required>
                                 <option value="">-- Select Category --</option>
                             </select>
                         </div>
@@ -534,7 +538,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-semibold text-secondary small">Requested Amount (₱)</label>
-                                <input type="number" name="RequestedAmount" step="0.01" min="1" class="form-control shadow-sm border-0" required />
+                                <input type="number" name="RequestedAmount" id="reqAmount" step="0.01" min="1" class="form-control shadow-sm border-0" required />
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-semibold text-secondary small">Date Needed</label>
@@ -599,5 +603,97 @@
         var deleteModalElement = document.getElementById('deleteModal');
         var deleteModalInstance = new bootstrap.Modal(deleteModalElement);
         deleteModalInstance.show();
+    }
+
+    // Intercept Forms for SweetAlert
+    const remainingBudgets = @Html.Raw(ViewBag.RemainingBudgetsJson ?? "{}");
+    
+    // Intercept Create Budget Allocation
+    const createForm = document.getElementById('createBudgetForm');
+    if (createForm) {
+        createForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const submitBtn = createForm.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+            
+            fetch(createForm.action, {
+                method: 'POST',
+                body: new FormData(createForm)
+            }).then(res => {
+                if (res.ok) {
+                    Swal.fire({
+                        title: 'Budget Allocation Created Successfully',
+                        text: 'The budget allocation has been saved successfully.',
+                        icon: 'success',
+                        confirmButtonColor: '#05828e'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire('Error', 'An error occurred while creating the budget allocation.', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Save Budget';
+                }
+            }).catch(err => {
+                Swal.fire('Error', 'Network error occurred.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Save Budget';
+            });
+        });
+    }
+
+    // Intercept Submit Budget Request
+    const submitReqForm = document.getElementById('submitRequestForm');
+    if (submitReqForm) {
+        submitReqForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const budgetSelect = document.getElementById('reqBudgetID');
+            const amountInput = document.getElementById('reqAmount');
+            const budgetId = budgetSelect.value;
+            const requestedAmount = parseFloat(amountInput.value) || 0;
+            
+            const remaining = remainingBudgets[budgetId] || 0;
+            
+            if (requestedAmount > remaining) {
+                amountInput.classList.add('is-invalid');
+                Swal.fire({
+                    title: 'Budget Limit Exceeded',
+                    text: 'The requested amount exceeds the remaining allocated budget for this department.',
+                    icon: 'warning',
+                    confirmButtonColor: '#05828e'
+                });
+                return; // Stop submission
+            }
+            amountInput.classList.remove('is-invalid');
+            
+            const submitBtn = submitReqForm.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...';
+            
+            fetch(submitReqForm.action, {
+                method: 'POST',
+                body: new FormData(submitReqForm)
+            }).then(res => {
+                if (res.ok) {
+                    Swal.fire({
+                        title: 'Budget Request Submitted',
+                        text: 'Your budget request has been submitted successfully and is awaiting Executive approval.',
+                        icon: 'success',
+                        confirmButtonColor: '#05828e'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire('Error', 'An error occurred while submitting the request.', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Submit Request';
+                }
+            }).catch(err => {
+                Swal.fire('Error', 'Network error occurred.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Submit Request';
+            });
+        });
     }
 </script>

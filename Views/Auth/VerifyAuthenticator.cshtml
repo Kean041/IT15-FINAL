@@ -4,8 +4,8 @@
     ViewData["Title"] = "Verify 2FA";
 }
 
-<div class="auth-title">Two-Factor Authentication</div>
-<div class="auth-subtitle mb-4">Enter the 6-digit code from your authenticator app to continue.</div>
+<div class="auth-title"><i class="bi bi-google text-danger me-2"></i>Google Authenticator</div>
+<div class="auth-subtitle mb-4">Enter the 6-digit code from your <strong>Google Authenticator</strong> app to continue.</div>
 
 <!-- Error Message -->
 @if (!ViewData.ModelState.IsValid)

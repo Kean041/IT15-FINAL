@@ -368,30 +368,7 @@
     </div>
 </div>
 
-<!-- APPROVE CONFIRMATION MODAL -->
-<div class="modal fade" id="approveModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
-            <div class="modal-body p-4 text-center">
-                <i class="bi bi-question-circle text-success mb-3" style="font-size:3.5rem;"></i>
-                <h5 class="fw-bold text-dark mb-2">Confirm Approval</h5>
-                <p class="text-muted small mb-4">Are you sure you want to approve this budget request?</p>
-                <form id="approveForm" asp-action="ApproveRequest" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="id" id="approveModalId" />
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-light flex-grow-1 fw-medium" onclick="cancelApproveModal()">Cancel</button>
-                        <button type="submit" class="btn btn-approve flex-grow-1 fw-medium">
-                            <i class="bi bi-check-circle me-1"></i> Confirm Approve
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- REJECT CONFIRMATION MODAL -->
 <div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
@@ -451,12 +428,10 @@
 
 <script>
     var reviewModalInstance;
-    var approveModalInstance;
     var rejectModalInstance;
 
     document.addEventListener('DOMContentLoaded', function () {
         reviewModalInstance = new bootstrap.Modal(document.getElementById('reviewModal'));
-        approveModalInstance = new bootstrap.Modal(document.getElementById('approveModal'));
         rejectModalInstance = new bootstrap.Modal(document.getElementById('rejectModal'));
     });
 
@@ -479,12 +454,43 @@
 
     function openApproveModal() {
         reviewModalInstance.hide();
-        approveModalInstance.show();
-    }
+        
+        const id = document.getElementById('rejectModalId').value;
+        const form = new FormData();
+        form.append('id', id);
+        
+        // Anti forgery token
+        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+        form.append('__RequestVerificationToken', token);
+        
+        const btn = document.querySelector('button[onclick="openApproveModal()"]');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
 
-    function cancelApproveModal() {
-        approveModalInstance.hide();
-        reviewModalInstance.show();
+        fetch('/Workflow/ApproveRequest', {
+            method: 'POST',
+            body: form
+        }).then(res => {
+            if (res.ok) {
+                Swal.fire({
+                    title: 'Request Approved',
+                    text: 'The budget request has been approved successfully.',
+                    icon: 'success',
+                    confirmButtonColor: '#05828e'
+                }).then(() => {
+                    window.location.reload();
+                });
+            } else {
+                Swal.fire('Error', 'An error occurred while approving the request.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }).catch(err => {
+            Swal.fire('Error', 'Network error occurred.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
     }
 
     function openRejectModal() {
@@ -513,5 +519,40 @@
         var reasonRow = document.getElementById('vmReasonRow');
         if (reason && reason.length > 0) { reasonRow.style.display = 'flex'; document.getElementById('vmReason').innerText = reason; } else { reasonRow.style.display = 'none'; }
         new bootstrap.Modal(document.getElementById('viewModal')).show();
+    }
+
+    // Intercept Reject Form
+    const rejectForm = document.getElementById('rejectForm');
+    if (rejectForm) {
+        rejectForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const submitBtn = rejectForm.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+            
+            fetch(rejectForm.action, {
+                method: 'POST',
+                body: new FormData(rejectForm)
+            }).then(res => {
+                if (res.ok) {
+                    Swal.fire({
+                        title: 'Request Rejected',
+                        text: 'The budget request has been rejected successfully.',
+                        icon: 'success',
+                        confirmButtonColor: '#E26D5C'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire('Error', 'An error occurred while rejecting the request.', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i> Confirm Reject';
+                }
+            }).catch(err => {
+                Swal.fire('Error', 'Network error occurred.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i> Confirm Reject';
+            });
+        });
     }
 </script>

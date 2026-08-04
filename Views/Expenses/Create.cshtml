@@ -346,10 +346,40 @@
         });
 
         form.addEventListener('submit', function (e) {
-            if (!validateAmount()) {
-                e.preventDefault();
-                amountInput.focus();
+            e.preventDefault();
+            if (!validateAmount() || !form.checkValidity()) {
+                form.classList.add('was-validated');
+                if (!validateAmount()) amountInput.focus();
+                return;
             }
+
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Recording...';
+
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form)
+            }).then(res => {
+                if (res.ok) {
+                    Swal.fire({
+                        title: 'Expense Recorded Successfully',
+                        text: 'The actual expense has been securely logged.',
+                        icon: 'success',
+                        confirmButtonColor: '#05828e'
+                    }).then(() => {
+                        window.location.href = '@Url.Action("Index", "Expenses")';
+                    });
+                } else {
+                    Swal.fire('Error', 'An error occurred while recording the expense. Please ensure all fields are valid.', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                }
+            }).catch(err => {
+                Swal.fire('Error', 'Network error occurred.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            });
         });
 
         if (budgetSelect.value) {

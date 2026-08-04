@@ -4,15 +4,15 @@
     ViewData["Title"] = "Setup 2FA";
 }
 
-<div class="auth-title">Setup 2FA</div>
-<div class="auth-subtitle mb-4">Scan the QR code below with your authenticator app (like Google Authenticator or Authy) to complete setup.</div>
+<div class="auth-title"><i class="bi bi-google text-danger me-2"></i>Google Authenticator</div>
+<div class="auth-subtitle mb-4">Scan the QR code below using the <strong>Google Authenticator</strong> app to complete setup.</div>
 
 <div class="text-center mb-4">
     <img src="@Model.QrCodeUri" alt="QR Code" class="img-fluid border rounded p-2 bg-white" style="max-width: 200px;" />
 </div>
 
 <div class="small text-muted text-center mb-4">
-    If you can't scan the QR code, manually enter this key:<br />
+    If you can't scan the QR code, manually enter this setup key in the Google Authenticator app:<br />
     <strong class="font-monospace text-dark">@Model.SecretKey</strong>
 </div>
 
@@ -39,7 +39,7 @@
     </div>
 
     <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
-        Verify and Enable 2FA <i class="bi bi-check-circle ms-2"></i>
+        Verify Google Authenticator <i class="bi bi-check-circle ms-2"></i>
     </button>
     
     <div class="text-center small">

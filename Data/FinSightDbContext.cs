@@ -24,6 +24,7 @@ namespace FinSight.Data
         public DbSet<Payment> Payments { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<UserOTP> UserOTPs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -175,6 +176,20 @@ namespace FinSight.Data
                 .HasOne(a => a.User)
                 .WithMany()
                 .HasForeignKey(a => a.UserID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // UserOTP → User (no cascade)
+            modelBuilder.Entity<UserOTP>()
+                .HasOne(o => o.User)
+                .WithMany()
+                .HasForeignKey(o => o.UserID)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // UserOTP → Tenant (no cascade)
+            modelBuilder.Entity<UserOTP>()
+                .HasOne(o => o.Tenant)
+                .WithMany()
+                .HasForeignKey(o => o.TenantID)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

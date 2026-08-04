@@ -19,18 +19,20 @@ namespace FinSight.Controllers
         private readonly AuditLogService _auditLog;
         private readonly NotificationService _notification;
         private readonly IConfiguration _configuration;
+        private readonly EmailService _emailService;
 
         // Lockout configuration
         private const int MaxFailedAttempts = 5;
         private const int LockoutMinutes = 15;
 
-        public AuthController(FinSightDbContext context, ILogger<AuthController> logger, AuditLogService auditLog, NotificationService notification, IConfiguration configuration)
+        public AuthController(FinSightDbContext context, ILogger<AuthController> logger, AuditLogService auditLog, NotificationService notification, IConfiguration configuration, EmailService emailService)
         {
             _context = context;
             _logger = logger;
             _auditLog = auditLog;
             _notification = notification;
             _configuration = configuration;
+            _emailService = emailService;
         }
 
         // ── REGISTER GET ────────────────────────────
@@ -232,111 +234,86 @@ namespace FinSight.Controllers
 
             // ── 2FA Check ──
             bool is2FaGloballyEnabled = _configuration.GetValue<bool>("TwoFactor:Enabled");
+            // Temporarily disable OTP Check
+            /*
             if (user.IsTwoFactorEnabled || is2FaGloballyEnabled)
             {
                 HttpContext.Session.SetInt32("Pending2FA_UserID", user.UserID);
                 HttpContext.Session.SetString("Pending2FA_Email", user.Email);
 
-                if (string.IsNullOrEmpty(user.TwoFactorSecretKey))
-                {
-                    // Needs to set up authenticator
-                    return RedirectToAction("SetupAuthenticator");
-                }
+                // Generate and send email OTP
+                await GenerateAndSendOTP(user);
 
-                // Needs to verify code
-                return RedirectToAction("VerifyAuthenticator");
+                return RedirectToAction("VerifyEmailOTP");
             }
+            */
 
             // Complete Login Immediately
             return await CompleteLogin(user);
         }
 
-        // ── SETUP AUTHENTICATOR GET ──────────────────────────────
-        [HttpGet]
-        public IActionResult SetupAuthenticator()
+        private async Task GenerateAndSendOTP(User user)
         {
-            var pendingUserId = HttpContext.Session.GetInt32("Pending2FA_UserID");
-            if (pendingUserId == null)
-                return RedirectToAction(nameof(Login));
-
-            // Generate new secret key
-            var secretKey = KeyGeneration.GenerateRandomKey(20);
-            var base32Secret = Base32Encoding.ToString(secretKey);
-
-            var pendingEmail = HttpContext.Session.GetString("Pending2FA_Email") ?? "User";
-            var issuer = "FinSight";
-
-            // Generate QR Code URI
-            var uriString = $"otpauth://totp/{issuer}:{pendingEmail}?secret={base32Secret}&issuer={issuer}&digits=6";
-
-            var qrGenerator = new QRCodeGenerator();
-            var qrCodeData = qrGenerator.CreateQrCode(uriString, QRCodeGenerator.ECCLevel.Q);
-            var qrCode = new PngByteQRCode(qrCodeData);
-            var qrCodeImage = qrCode.GetGraphic(20);
-            var base64QrCode = Convert.ToBase64String(qrCodeImage);
-
-            var model = new TwoFactorViewModel
+            // Invalidate any existing OTPs for the user
+            var existingOtps = await _context.UserOTPs
+                .Where(o => o.UserID == user.UserID && !o.IsUsed && !o.IsExpired)
+                .ToListAsync();
+                
+            foreach (var existing in existingOtps)
             {
-                SecretKey = base32Secret,
-                QrCodeUri = $"data:image/png;base64,{base64QrCode}"
-            };
-
-            return View(model);
-        }
-
-        // ── SETUP AUTHENTICATOR POST ─────────────────────────────
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SetupAuthenticator(TwoFactorViewModel model)
-        {
-            var pendingUserId = HttpContext.Session.GetInt32("Pending2FA_UserID");
-            if (pendingUserId == null)
-                return RedirectToAction(nameof(Login));
-
-            if (!ModelState.IsValid)
-                return View(model);
-
-            var totp = new Totp(Base32Encoding.ToBytes(model.SecretKey));
-            if (totp.VerifyTotp(model.Code, out long timeStepMatched, new VerificationWindow(2, 2)))
-            {
-                var user = await _context.Users.Include(u => u.Tenant).FirstOrDefaultAsync(u => u.UserID == pendingUserId.Value);
-                if (user != null)
-                {
-                    user.TwoFactorSecretKey = model.SecretKey;
-                    user.IsTwoFactorEnabled = true;
-                    _context.Update(user);
-                    await _context.SaveChangesAsync();
-
-                    HttpContext.Session.Remove("Pending2FA_UserID");
-                    HttpContext.Session.Remove("Pending2FA_Email");
-
-                    // Audit: 2FA Setup
-                    await _auditLog.LogSecurityAction(user.TenantID, user.UserID,
-                        "TwoFactorSetup", $"User {user.Email} successfully set up 2FA.", GetIP(), "Info");
-
-                    return await CompleteLogin(user);
-                }
+                existing.IsExpired = true;
             }
-
-            ModelState.AddModelError("Code", "Invalid verification code.");
-            return View(model);
+            
+            // Generate 6 digit code
+            string code = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+            
+            // Store hashed OTP
+            var userOtp = new UserOTP
+            {
+                UserID = user.UserID,
+                TenantID = user.TenantID,
+                OTPHash = PasswordHelper.HashPassword(code),
+                GeneratedAt = DateTime.Now,
+                ExpiresAt = DateTime.Now.AddSeconds(60),
+                CreatedByIP = GetIP(),
+                IsUsed = false,
+                AttemptCount = 0,
+                IsExpired = false
+            };
+            
+            _context.UserOTPs.Add(userOtp);
+            await _context.SaveChangesAsync();
+            
+            // Send email
+            string subject = "FinSight Multi-Factor Authentication Code";
+            string body = $"Hello {user.FullName},\n\nYour FinSight verification code is:\n\n{code}\n\nThis code will expire in 60 seconds.\n\nIf you did not attempt to sign in, please ignore this email and consider changing your password.\n\nThank you,\nFinSight Security Team";
+            
+            await _emailService.SendEmailAsync(user.Email, subject, body);
+            
+            // Audit Log
+            await _auditLog.LogSecurityAction(user.TenantID, user.UserID, "OTPSent", $"OTP Sent to {user.Email}", GetIP(), "Info");
+            await _notification.CreateNotificationAsync(user.TenantID, user.UserID, "Security", "OTP Sent", "An OTP was sent to your email address.", null);
         }
 
-        // ── VERIFY AUTHENTICATOR GET ─────────────────────────────
+        // ── VERIFY EMAIL OTP GET ─────────────────────────────
         [HttpGet]
-        public IActionResult VerifyAuthenticator()
+        public IActionResult VerifyEmailOTP()
         {
             var pendingUserId = HttpContext.Session.GetInt32("Pending2FA_UserID");
             if (pendingUserId == null)
                 return RedirectToAction(nameof(Login));
 
-            return View(new TwoFactorViewModel());
+            var model = new EmailMfaViewModel 
+            { 
+                Email = HttpContext.Session.GetString("Pending2FA_Email") 
+            };
+            return View(model);
         }
 
-        // ── VERIFY AUTHENTICATOR POST ────────────────────────────
+        // ── VERIFY EMAIL OTP POST ────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> VerifyAuthenticator(TwoFactorViewModel model)
+        public async Task<IActionResult> VerifyEmailOTP(EmailMfaViewModel model)
         {
             var pendingUserId = HttpContext.Session.GetInt32("Pending2FA_UserID");
             if (pendingUserId == null)
@@ -346,26 +323,101 @@ namespace FinSight.Controllers
                 return View(model);
 
             var user = await _context.Users.Include(u => u.Tenant).FirstOrDefaultAsync(u => u.UserID == pendingUserId.Value);
-            if (user == null || string.IsNullOrEmpty(user.TwoFactorSecretKey))
-            {
+            if (user == null)
                 return RedirectToAction(nameof(Login));
+
+            // Check if user is locked out from MFA
+            if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTime.Now)
+            {
+                ModelState.AddModelError("", $"Account is temporarily locked. Try again later.");
+                return View(model);
             }
 
-            var totp = new Totp(Base32Encoding.ToBytes(user.TwoFactorSecretKey));
-            if (totp.VerifyTotp(model.Code, out long timeStepMatched, new VerificationWindow(2, 2)))
+            var activeOtp = await _context.UserOTPs
+                .Where(o => o.UserID == user.UserID && !o.IsUsed && !o.IsExpired)
+                .OrderByDescending(o => o.GeneratedAt)
+                .FirstOrDefaultAsync();
+
+            if (activeOtp == null || activeOtp.ExpiresAt < DateTime.Now)
             {
+                if (activeOtp != null && activeOtp.ExpiresAt < DateTime.Now)
+                {
+                    activeOtp.IsExpired = true;
+                    await _context.SaveChangesAsync();
+                    await _auditLog.LogSecurityAction(user.TenantID, user.UserID, "OTPExpired", "OTP code expired before use.", GetIP(), "Warning");
+                }
+                
+                ModelState.AddModelError("", "The code has expired or is invalid. Please request a new one.");
+                return View(model);
+            }
+
+            // Verify Code
+            if (PasswordHelper.VerifyPassword(model.Code, activeOtp.OTPHash))
+            {
+                // Success
+                activeOtp.IsUsed = true;
+                activeOtp.UsedAt = DateTime.Now;
+                await _context.SaveChangesAsync();
+
                 HttpContext.Session.Remove("Pending2FA_UserID");
                 HttpContext.Session.Remove("Pending2FA_Email");
 
+                await _auditLog.LogSecurityAction(user.TenantID, user.UserID, "OTPVerificationSuccess", "Successfully verified OTP code.", GetIP(), "Info");
                 return await CompleteLogin(user);
             }
 
-            ModelState.AddModelError("Code", "Invalid authenticator code.");
-            // Audit: Failed 2FA
-            await _auditLog.LogSecurityAction(user.TenantID, user.UserID,
-                "TwoFactorFailed", $"Failed 2FA verification attempt for {user.Email}.", GetIP(), "Warning");
+            // Failed Verification
+            activeOtp.AttemptCount++;
+            if (activeOtp.AttemptCount >= MaxFailedAttempts)
+            {
+                activeOtp.IsExpired = true; // Invalidate current OTP
+                user.LockoutEnd = DateTime.Now.AddMinutes(LockoutMinutes); // Lockout MFA
+                await _context.SaveChangesAsync();
 
+                await _auditLog.LogSecurityAction(user.TenantID, user.UserID, "AccountLocked", $"MFA Account locked after {activeOtp.AttemptCount} failed OTP attempts.", GetIP(), "Critical");
+                await _notification.CreateNotificationAsync(user.TenantID, user.UserID, "Security", "Account Locked", "Your account was locked due to too many failed MFA attempts.", null);
+
+                ModelState.AddModelError("", "Too many failed attempts. Your account has been temporarily locked.");
+                return View(model);
+            }
+
+            await _context.SaveChangesAsync();
+            await _auditLog.LogSecurityAction(user.TenantID, user.UserID, "OTPVerificationFailed", $"Failed OTP verification attempt. Attempt #{activeOtp.AttemptCount}.", GetIP(), "Warning");
+
+            model.RemainingAttempts = MaxFailedAttempts - activeOtp.AttemptCount;
+            ModelState.AddModelError("Code", $"Invalid verification code. {model.RemainingAttempts} attempts remaining.");
             return View(model);
+        }
+
+        // ── RESEND EMAIL OTP POST ────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResendEmailOTP()
+        {
+            var pendingUserId = HttpContext.Session.GetInt32("Pending2FA_UserID");
+            if (pendingUserId == null)
+                return RedirectToAction(nameof(Login));
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserID == pendingUserId.Value);
+            if (user == null)
+                return RedirectToAction(nameof(Login));
+
+            // Prevent spamming resends (limit 3 per 15 minutes)
+            var recentOtps = await _context.UserOTPs
+                .Where(o => o.UserID == user.UserID && o.GeneratedAt > DateTime.Now.AddMinutes(-15))
+                .CountAsync();
+
+            if (recentOtps >= 3)
+            {
+                TempData["ErrorMessage"] = "You have requested too many codes recently. Please wait a while before requesting a new one.";
+                return RedirectToAction(nameof(VerifyEmailOTP));
+            }
+
+            await GenerateAndSendOTP(user);
+            await _auditLog.LogSecurityAction(user.TenantID, user.UserID, "OTPResent", "User requested a new OTP code.", GetIP(), "Info");
+
+            TempData["SuccessMessage"] = "A new verification code has been sent to your email.";
+            return RedirectToAction(nameof(VerifyEmailOTP));
         }
 
 

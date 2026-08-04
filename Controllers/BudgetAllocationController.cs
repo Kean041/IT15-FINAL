@@ -187,19 +187,32 @@ namespace FinSight.Controllers
             {
                 int dropDeptId = departmentHeadDepartmentId.Value;
 
-                var deptBudgets = await _context.Budgets
+                var rawBudgets = await _context.Budgets
                     .Include(b => b.Department)
                     .Where(b => b.DepartmentID == dropDeptId
                              && (tenantFilter == null || b.TenantID == tenantFilter.Value)
                              && b.Status == "Active")
                     .OrderBy(b => b.Category)
-                    .Select(b => new SelectListItem
+                    .ToListAsync();
+
+                var remainingBudgetsDict = new Dictionary<int, decimal>();
+                var deptBudgets = new List<SelectListItem>();
+
+                foreach(var b in rawBudgets)
+                {
+                    decimal approved = approvedAmounts.ContainsKey(b.BudgetID) ? approvedAmounts[b.BudgetID] : 0m;
+                    decimal remaining = b.Amount - approved;
+                    remainingBudgetsDict[b.BudgetID] = remaining;
+
+                    deptBudgets.Add(new SelectListItem
                     {
                         Value = b.BudgetID.ToString(),
-                        Text = b.Category + " — " + (b.Department != null ? b.Department.DepartmentName : "N/A") + " (₱" + b.Amount.ToString("N2") + ")"
-                    }).ToListAsync();
+                        Text = b.Category + " — " + (b.Department != null ? b.Department.DepartmentName : "N/A") + " (Rem: ₱" + remaining.ToString("N2") + ")"
+                    });
+                }
 
                 ViewBag.DeptBudgets = deptBudgets;
+                ViewBag.RemainingBudgetsJson = System.Text.Json.JsonSerializer.Serialize(remainingBudgetsDict);
             }
 
             // Pass RBAC flags to view for conditional UI
@@ -214,7 +227,7 @@ namespace FinSight.Controllers
         // POST: BudgetAllocation/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(string DepartmentName, string Category, decimal Amount, int Year, string Status)
+        public async Task<IActionResult> Create(string DepartmentName, string Category, decimal Amount, int Year, string Status, string? Message)
         {
              if (!IsAuthenticated) return RedirectToLogin();
 
@@ -259,10 +272,16 @@ namespace FinSight.Controllers
                  "AllocationCreated", $"Budget allocation '{Category}' of ₱{Amount:N2} created for {trimmedDeptName}.",
                  HttpContext.Connection.RemoteIpAddress?.ToString());
 
+             string notificationBody = $"A new budget allocation '{Category}' of ₱{Amount:N2} was created for {trimmedDeptName}.";
+             if (!string.IsNullOrWhiteSpace(Message))
+             {
+                 notificationBody += $"\n\nMessage: {Message}";
+             }
+
              // Notify tenant admins about new allocation
              await _notification.CreateTenantBroadcastAsync(tenantId, "System",
                  "Budget Allocation Created",
-                 $"A new budget allocation '{Category}' of ₱{Amount:N2} was created for {trimmedDeptName}.",
+                 notificationBody,
                  "/BudgetAllocation");
 
              TempData["Success"] = "Budget allocation created successfully.";
