@@ -46,14 +46,6 @@ namespace FinSight.Models
         [StringLength(500)]
         public string? TwoFactorSecretKey { get; set; }  // Reserved for future authenticator app support
 
-        [StringLength(500)]
-        public string? OTPCode { get; set; }              // Hashed OTP (never stored in plaintext)
-
-        public DateTime? OTPExpiration { get; set; }
-        public int FailedOTPAttempts { get; set; } = 0;
-        public DateTime? OTPLockoutEnd { get; set; }
-        public DateTime? LastOTPSentAt { get; set; }
-
         // Navigation properties
         [ForeignKey("TenantID")]
         public Tenant? Tenant { get; set; }

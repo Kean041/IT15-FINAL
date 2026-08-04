@@ -22,7 +22,6 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<NotificationService>();
-builder.Services.AddScoped<TwoFactorService>();
 builder.Services.AddHttpClient<AlphaVantageService>();
 builder.Services.AddScoped<AlphaVantageService>();
 

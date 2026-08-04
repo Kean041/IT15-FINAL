@@ -147,6 +147,8 @@ namespace FinSight.Controllers
         public async Task<IActionResult> Create(
             string ScenarioName,
             string? Description,
+            decimal? AppliedInflation,
+            decimal? AppliedExchangeRate,
             List<int>    BudgetIDs,
             List<decimal> AdjustedAmounts)
         {
@@ -175,6 +177,8 @@ namespace FinSight.Controllers
             {
                 ScenarioName = ScenarioName.Trim(),
                 Description  = Description?.Trim(),
+                AppliedInflation = AppliedInflation,
+                AppliedExchangeRate = AppliedExchangeRate,
                 TenantID     = tenantId,
                 CreatedBy    = userId,
                 CreatedAt    = DateTime.Now
@@ -234,6 +238,8 @@ namespace FinSight.Controllers
             int ScenarioID,
             string ScenarioName,
             string? Description,
+            decimal? AppliedInflation,
+            decimal? AppliedExchangeRate,
             List<int>     BudgetIDs,
             List<decimal> AdjustedAmounts)
         {
@@ -260,6 +266,8 @@ namespace FinSight.Controllers
             // Update header
             existing.ScenarioName = ScenarioName.Trim();
             existing.Description  = Description?.Trim();
+            existing.AppliedInflation = AppliedInflation;
+            existing.AppliedExchangeRate = AppliedExchangeRate;
 
             // Replace all details
             _context.ScenarioDetails.RemoveRange(existing.ScenarioDetails);
@@ -389,6 +397,107 @@ namespace FinSight.Controllers
                 .ToListAsync();
 
             ViewBag.Budgets = budgets;
+        }
+
+        // ─────────────────────────────────────────────
+        // GET: Scenario/RunSimulation/5
+        // ─────────────────────────────────────────────
+        public async Task<IActionResult> RunSimulation(int id)
+        {
+            if (!IsAuthenticated) return RedirectToLogin();
+            if (!CanAccessScenario) return AccessDenied();
+
+            int? tenantFilter = GetTenantFilter();
+
+            var scenario = await _context.Scenarios
+                .Include(s => s.ScenarioDetails)
+                .ThenInclude(sd => sd.Budget)
+                .ThenInclude(b => b.Department)
+                .FirstOrDefaultAsync(s => s.ScenarioID == id && (tenantFilter == null || s.TenantID == tenantFilter.Value));
+
+            if (scenario == null)
+            {
+                TempData["Error"] = "Scenario not found.";
+                return RedirectToAction(nameof(Planning));
+            }
+
+            // Fetch actual expenses for the budgets in this scenario
+            var budgetIds = scenario.ScenarioDetails.Select(sd => sd.BudgetID).ToList();
+            var expenses = await _context.Expenses
+                .Where(e => budgetIds.Contains(e.BudgetID))
+                .GroupBy(e => e.BudgetID)
+                .Select(g => new { BudgetID = g.Key, TotalExpenses = g.Sum(x => x.Amount) })
+                .ToDictionaryAsync(x => x.BudgetID, x => x.TotalExpenses);
+
+            var simulationResults = new List<FinSight.Models.ViewModels.DynamicForecastViewModel>();
+            decimal inflationToApply = scenario.AppliedInflation.HasValue ? (scenario.AppliedInflation.Value / 100m) : 0m;
+            decimal exchangeRate = scenario.AppliedExchangeRate ?? 1m;
+
+            DateTime today = DateTime.Now;
+
+            foreach (var detail in scenario.ScenarioDetails)
+            {
+                if (detail.Budget == null) continue;
+
+                var totalExpenses = expenses.GetValueOrDefault(detail.BudgetID, 0m);
+                var simulatedBudgetAmount = detail.AdjustedAmount; // The adjusted amount becomes the new budget
+
+                // Simple run rate
+                DateTime startOfYear = new DateTime(detail.Budget.Year, 1, 1);
+                DateTime currentDateToUse = (detail.Budget.Year == today.Year) ? today : new DateTime(detail.Budget.Year, 12, 31);
+                
+                int elapsedDays = (currentDateToUse - startOfYear).Days;
+                if (elapsedDays <= 0) elapsedDays = 1;
+                int totalDaysInYear = DateTime.IsLeapYear(detail.Budget.Year) ? 366 : 365;
+
+                decimal dailyRunRate = totalExpenses / elapsedDays;
+                decimal baseRunRate = dailyRunRate * totalDaysInYear;
+                
+                // Project future expenses by applying inflation to the remaining expected expenses
+                decimal futureExpenses = baseRunRate * (1 + inflationToApply);
+                
+                // Since this is a simulation, we might also have an exchange rate multiplier if costs are in foreign currency,
+                // but let's just apply it to future expenses as a simple illustration if they want to simulate FX impact.
+                futureExpenses *= exchangeRate;
+
+                decimal futureUtilization = simulatedBudgetAmount > 0 ? (futureExpenses / simulatedBudgetAmount) * 100m : 0m;
+                decimal projectedRemaining = simulatedBudgetAmount - futureExpenses;
+                decimal predictedVariance = simulatedBudgetAmount - futureExpenses;
+
+                string status;
+                if (futureExpenses > simulatedBudgetAmount)
+                    status = "Projected Over Budget";
+                else if (futureExpenses < simulatedBudgetAmount)
+                    status = "Projected Under Budget";
+                else
+                    status = "Projected On Track";
+
+                simulationResults.Add(new FinSight.Models.ViewModels.DynamicForecastViewModel
+                {
+                    BudgetID = detail.BudgetID,
+                    DepartmentID = detail.DepartmentID,
+                    DepartmentName = detail.Budget.Department?.DepartmentName ?? "Unknown",
+                    Category = detail.Budget.Category,
+                    BudgetAmount = simulatedBudgetAmount, // Showing the simulated budget here
+                    CurrentExpenses = totalExpenses,
+                    CurrentUtilization = simulatedBudgetAmount > 0 ? (totalExpenses / simulatedBudgetAmount) * 100m : 0m,
+                    RunRate = baseRunRate,
+                    AppliedInflationRate = inflationToApply,
+                    FutureExpenses = futureExpenses,
+                    FutureBudgetUtilization = futureUtilization,
+                    ProjectedRemainingBudget = projectedRemaining,
+                    PredictedVariance = predictedVariance,
+                    Status = status,
+                    Year = detail.Budget.Year
+                });
+            }
+
+            ViewBag.ScenarioName = scenario.ScenarioName;
+            ViewBag.ScenarioId = scenario.ScenarioID;
+            ViewBag.AppliedInflation = scenario.AppliedInflation;
+            ViewBag.AppliedExchangeRate = scenario.AppliedExchangeRate;
+
+            return View("SimulationResult", simulationResults);
         }
     }
 }

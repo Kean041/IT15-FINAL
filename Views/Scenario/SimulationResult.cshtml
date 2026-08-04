@@ -1,0 +1,148 @@
+@model IEnumerable<FinSight.Models.ViewModels.DynamicForecastViewModel>
+
+@{
+    ViewData["Title"] = "Simulation Results - " + ViewBag.ScenarioName;
+    var totalSimulatedBudget = Model.Sum(x => x.BudgetAmount);
+    var totalProjectedExpenses = Model.Sum(x => x.FutureExpenses);
+    var totalProjectedVariance = Model.Sum(x => x.PredictedVariance);
+    var overallUtilization = totalSimulatedBudget > 0 ? (totalProjectedExpenses / totalSimulatedBudget) * 100m : 0m;
+}
+
+<style>
+:root {
+    --accent: #05828e;
+    --accent-dark: #047078;
+    --accent-light: rgba(5, 130, 142, 0.08);
+    --dark: #162229;
+    --muted: #9ba8b8;
+    --bg: #e7eaef;
+    --danger: #E26D5C;
+}
+
+.mod-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid rgba(155,168,184,.15);
+    padding: 1.25rem 1.5rem;
+}
+
+.stat-card {
+    background: #fff;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,.03);
+    padding: 20px;
+    height: 100%;
+    border-left: 5px solid var(--accent);
+}
+</style>
+
+<div class="container-fluid px-0">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a asp-action="Planning" class="btn btn-sm btn-outline-secondary mb-2">
+                <i class="bi bi-arrow-left me-1"></i> Back to Scenarios
+            </a>
+            <h2 class="fw-bold text-dark mb-0">Simulation: @ViewBag.ScenarioName</h2>
+            <p class="text-muted mb-0">Hypothetical financial simulation results without modifying real actuals.</p>
+        </div>
+    </div>
+
+    <!-- Assumptions Banner -->
+    <div class="alert alert-info border-0 shadow-sm rounded-4 mb-4 d-flex align-items-center justify-content-between p-3" style="background: rgba(5,130,142,0.1); color: var(--dark);">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-sliders fs-3 text-accent me-3"></i>
+            <div>
+                <h6 class="fw-bold mb-1">Applied Simulation Parameters</h6>
+                <span class="small me-3"><strong>Hypothetical Inflation:</strong> @(ViewBag.AppliedInflation ?? 0)%</span>
+                <span class="small me-3"><strong>FX Multiplier:</strong> @(ViewBag.AppliedExchangeRate ?? 1.0)x</span>
+            </div>
+        </div>
+        <span class="badge bg-accent text-white px-3 py-2 rounded-pill">Simulation Mode</span>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card">
+                <h6 class="fw-bold text-uppercase small text-muted">Simulated Total Budget</h6>
+                <h3 class="fw-bold text-dark mb-0">₱@totalSimulatedBudget.ToString("N0")</h3>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card" style="border-left-color: var(--dark);">
+                <h6 class="fw-bold text-uppercase small text-muted">Projected Expenses</h6>
+                <h3 class="fw-bold text-dark mb-0">₱@totalProjectedExpenses.ToString("N0")</h3>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <h6 class="fw-bold text-uppercase small text-muted">Projected Utilization</h6>
+                <h3 class="fw-bold text-dark mb-0">@overallUtilization.ToString("N1")%</h3>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card" style="border-left-color: @(totalProjectedVariance >= 0 ? "#10B981" : "var(--danger)");">
+                <h6 class="fw-bold text-uppercase small text-muted">Projected Variance</h6>
+                <h3 class="fw-bold mb-0 @(totalProjectedVariance >= 0 ? "text-success" : "text-danger")">
+                    @(totalProjectedVariance >= 0 ? "+" : "")₱@totalProjectedVariance.ToString("N0")
+                </h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="mod-card mb-4">
+        <h5 class="fw-bold text-dark mb-3"><i class="bi bi-table me-2 text-accent"></i>Simulated Line Items</h5>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Department</th>
+                        <th>Category</th>
+                        <th>Simulated Budget</th>
+                        <th>Actual Spend to Date</th>
+                        <th>Run Rate</th>
+                        <th>Projected Total Exp.</th>
+                        <th>Projected Util.</th>
+                        <th>Projected Variance</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td class="fw-semibold text-accent">@item.DepartmentName</td>
+                            <td>@item.Category</td>
+                            <td class="fw-bold">₱@item.BudgetAmount.ToString("N0")</td>
+                            <td class="text-muted">₱@item.CurrentExpenses.ToString("N0")</td>
+                            <td>₱@item.RunRate.ToString("N0")</td>
+                            <td class="fw-bold">₱@item.FutureExpenses.ToString("N0")</td>
+                            <td>@item.FutureBudgetUtilization.ToString("N1")%</td>
+                            <td class="@(item.PredictedVariance >= 0 ? "text-success fw-bold" : "text-danger fw-bold")">
+                                @(item.PredictedVariance >= 0 ? "+" : "")₱@item.PredictedVariance.ToString("N0")
+                            </td>
+                            <td>
+                                @if (item.Status.Contains("Under"))
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Under Budget</span>
+                                }
+                                else if (item.Status.Contains("Over"))
+                                {
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Over Budget</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">On Track</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

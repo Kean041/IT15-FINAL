@@ -1,0 +1,52 @@
+@model FinSight.Models.ViewModels.TwoFactorViewModel
+@{
+    Layout = "~/Views/Shared/_IdentityLayout.cshtml";
+    ViewData["Title"] = "Setup 2FA";
+}
+
+<div class="auth-title">Setup 2FA</div>
+<div class="auth-subtitle mb-4">Scan the QR code below with your authenticator app (like Google Authenticator or Authy) to complete setup.</div>
+
+<div class="text-center mb-4">
+    <img src="@Model.QrCodeUri" alt="QR Code" class="img-fluid border rounded p-2 bg-white" style="max-width: 200px;" />
+</div>
+
+<div class="small text-muted text-center mb-4">
+    If you can't scan the QR code, manually enter this key:<br />
+    <strong class="font-monospace text-dark">@Model.SecretKey</strong>
+</div>
+
+<!-- Error Message -->
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger py-2 small mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>Invalid verification code. Please try again.
+    </div>
+}
+
+<form asp-action="SetupAuthenticator" asp-controller="Auth" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="SecretKey" />
+    <input type="hidden" asp-for="QrCodeUri" />
+
+    <div class="mb-4">
+        <label asp-for="Code" class="form-label">Verification Code</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-shield-lock"></i></span>
+            <input asp-for="Code" class="form-control text-center font-monospace" placeholder="123456" maxlength="6" autocomplete="off" />
+        </div>
+        <span asp-validation-for="Code" class="field-validation-error text-danger small"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
+        Verify and Enable 2FA <i class="bi bi-check-circle ms-2"></i>
+    </button>
+    
+    <div class="text-center small">
+        <a asp-action="Login" class="text-muted text-decoration-none">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -39,6 +39,24 @@ namespace FinSight.Data
                 END");
 
             logger.LogInformation("Expenses schema repair complete.");
+
+            // Ensure Scenarios table has AppliedInflation and AppliedExchangeRate columns
+            logger.LogInformation("Ensuring Scenarios table has economic assumption columns...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('Scenarios', 'U') IS NOT NULL
+                BEGIN
+                    IF COL_LENGTH('Scenarios', 'AppliedInflation') IS NULL
+                    BEGIN
+                        ALTER TABLE Scenarios ADD AppliedInflation DECIMAL(18,2) NULL;
+                    END
+
+                    IF COL_LENGTH('Scenarios', 'AppliedExchangeRate') IS NULL
+                    BEGIN
+                        ALTER TABLE Scenarios ADD AppliedExchangeRate DECIMAL(18,2) NULL;
+                    END
+                END");
+
+            logger.LogInformation("Scenarios schema repair complete.");
         }
 
         public static async Task InitializeAsync(FinSightDbContext context, ILogger logger, IConfiguration configuration)

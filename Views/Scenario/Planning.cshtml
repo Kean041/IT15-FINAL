@@ -265,9 +265,12 @@
                                     <td style="color:var(--muted);font-size:13px;">@item.CreatedAt.ToString("MMM dd, yyyy")</td>
                                     <td class="text-end pe-4">
                                         <div class="d-flex justify-content-end gap-2">
+                                            <a asp-action="RunSimulation" asp-route-id="@item.ScenarioID" class="btn btn-sm btn-accent shadow-sm" title="Run Simulation">
+                                                <i class="bi bi-play-fill me-1"></i>Simulate
+                                            </a>
                                             <button type="button"
                                                     class="btn btn-sm btn-outline-accent"
-                                                    onclick="openEditModal(@item.ScenarioID, '@Html.Raw(item.ScenarioName.Replace("'","\\'"  ))', '@Html.Raw((item.Description ?? "").Replace("'","\\'"))',
+                                                    onclick="openEditModal(@item.ScenarioID, '@Html.Raw(item.ScenarioName.Replace("'","\\'"  ))', '@Html.Raw((item.Description ?? "").Replace("'","\\'"))', '@item.AppliedInflation', '@item.AppliedExchangeRate',
                                                         [@string.Join(",", item.ScenarioDetails.Select(sd => sd.BudgetID))],
                                                         [@string.Join(",", item.ScenarioDetails.Select(sd => sd.AdjustedAmount.ToString(CultureInfo.InvariantCulture)))])">
                                                 <i class="bi bi-pencil"></i>
@@ -345,6 +348,18 @@
                                    placeholder="Optional description" />
                         </div>
                     </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small" style="color:var(--muted);">Hypothetical Inflation Rate (%)</label>
+                            <input type="number" step="0.01" name="AppliedInflation" class="form-control shadow-sm border-0"
+                                   placeholder="e.g. 3.5" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small" style="color:var(--muted);">Hypothetical FX Rate Multiplier</label>
+                            <input type="number" step="0.0001" name="AppliedExchangeRate" class="form-control shadow-sm border-0"
+                                   placeholder="e.g. 1.05 (5% increase)" />
+                        </div>
+                    </div>
 
                     <hr class="my-3">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -399,6 +414,16 @@
                             <label class="form-label fw-semibold small" style="color:var(--muted);">Description</label>
                             <input type="text" name="Description" id="editDescription"
                                    class="form-control shadow-sm border-0" />
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small" style="color:var(--muted);">Hypothetical Inflation Rate (%)</label>
+                            <input type="number" step="0.01" name="AppliedInflation" id="editAppliedInflation" class="form-control shadow-sm border-0" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small" style="color:var(--muted);">Hypothetical FX Rate Multiplier</label>
+                            <input type="number" step="0.0001" name="AppliedExchangeRate" id="editAppliedExchangeRate" class="form-control shadow-sm border-0" />
                         </div>
                     </div>
 
@@ -524,10 +549,12 @@
     });
 
     // ── Open Edit modal ─────────────────────────────────────────
-    function openEditModal(scenarioID, scenarioName, description, budgetIds, adjustedAmounts) {
+    function openEditModal(scenarioID, scenarioName, description, appliedInflation, appliedExchangeRate, budgetIds, adjustedAmounts) {
         document.getElementById('editScenarioID').value   = scenarioID;
         document.getElementById('editScenarioName').value = scenarioName;
         document.getElementById('editDescription').value  = description;
+        document.getElementById('editAppliedInflation').value = appliedInflation ?? '';
+        document.getElementById('editAppliedExchangeRate').value = appliedExchangeRate ?? '';
 
         const container = document.getElementById('editDetailRows');
         container.innerHTML = '';

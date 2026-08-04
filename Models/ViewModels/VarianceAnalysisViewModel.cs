@@ -11,8 +11,11 @@ namespace FinSight.Models.ViewModels
         public string DepartmentName { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
         public decimal BudgetAmount { get; set; }
+        public decimal TotalApprovedRequests { get; set; }
         public decimal TotalExpenses { get; set; }
+        public decimal RemainingBudget { get; set; }
         public decimal Variance { get; set; }
+        public decimal BudgetUtilizationPercentage { get; set; }
         public string Status { get; set; } = string.Empty;
         public int Year { get; set; }
     }

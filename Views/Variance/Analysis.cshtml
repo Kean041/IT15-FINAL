@@ -231,8 +231,11 @@
                             <th class="ps-4">Department</th>
                             <th>Category</th>
                             <th>Budget (₱)</th>
+                            <th>Approved Req. (₱)</th>
                             <th>Actual (₱)</th>
+                            <th>Remaining (₱)</th>
                             <th>Variance (₱)</th>
+                            <th>Util %</th>
                             <th>Status</th>
                             <th>Year</th>
                         </tr>
@@ -246,9 +249,14 @@
                                     <td class="ps-4 fw-semibold text-accent">@item.DepartmentName</td>
                                     <td>@item.Category</td>
                                     <td class="fw-bold">@item.BudgetAmount.ToString("N2")</td>
+                                    <td class="fw-bold text-muted">@item.TotalApprovedRequests.ToString("N2")</td>
                                     <td class="fw-bold">@item.TotalExpenses.ToString("N2")</td>
+                                    <td class="fw-bold">@item.RemainingBudget.ToString("N2")</td>
                                     <td class="@(item.Variance >= 0 ? "val-positive" : "val-negative")">
                                         @(item.Variance >= 0 ? "+" : "")@item.Variance.ToString("N2")
+                                    </td>
+                                    <td class="fw-bold">
+                                        @item.BudgetUtilizationPercentage.ToString("0.0")%
                                     </td>
                                     <td>
                                         @if (item.Status == "Under Budget")

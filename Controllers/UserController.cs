@@ -409,14 +409,7 @@ namespace FinSight.Controllers
             // Toggle 2FA
             user.IsTwoFactorEnabled = !user.IsTwoFactorEnabled;
 
-            // Clear OTP data when disabling
-            if (!user.IsTwoFactorEnabled)
-            {
-                user.OTPCode = null;
-                user.OTPExpiration = null;
-                user.FailedOTPAttempts = 0;
-                user.OTPLockoutEnd = null;
-            }
+
 
             user.UpdatedAt = DateTime.Now;
             _context.Update(user);

@@ -1,0 +1,41 @@
+@model FinSight.Models.ViewModels.TwoFactorViewModel
+@{
+    Layout = "~/Views/Shared/_IdentityLayout.cshtml";
+    ViewData["Title"] = "Verify 2FA";
+}
+
+<div class="auth-title">Two-Factor Authentication</div>
+<div class="auth-subtitle mb-4">Enter the 6-digit code from your authenticator app to continue.</div>
+
+<!-- Error Message -->
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger py-2 small mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>Invalid authenticator code. Please try again.
+    </div>
+}
+
+<form asp-action="VerifyAuthenticator" asp-controller="Auth" method="post">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-4">
+        <label asp-for="Code" class="form-label">Authentication Code</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-shield-lock"></i></span>
+            <input asp-for="Code" class="form-control text-center font-monospace" placeholder="123456" maxlength="6" autocomplete="off" autofocus />
+        </div>
+        <span asp-validation-for="Code" class="field-validation-error text-danger small"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
+        Verify <i class="bi bi-arrow-right ms-2"></i>
+    </button>
+    
+    <div class="text-center small">
+        <a asp-action="Login" class="text-muted text-decoration-none">Back to Login</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

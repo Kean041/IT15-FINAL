@@ -72,12 +72,34 @@ namespace FinSight.Controllers
             var expenseDict = expenseTotals.ToDictionary(e => e.BudgetID, e => e.TotalExpenses);
 
             // ──────────────────────────────────────────────
+            // 2.5 Fetch approved budget requests grouped by BudgetID
+            // ──────────────────────────────────────────────
+            var requestsQuery = _context.BudgetRequests.Where(r => r.Status == "Approved");
+            
+            if (tenantFilter != null)
+                requestsQuery = requestsQuery.Where(r => r.TenantID == tenantFilter.Value);
+
+            var requestTotals = await requestsQuery
+                .GroupBy(r => r.BudgetID)
+                .Select(g => new
+                {
+                    BudgetID = g.Key,
+                    TotalApproved = g.Sum(r => r.RequestedAmount)
+                })
+                .ToListAsync();
+
+            var requestDict = requestTotals.ToDictionary(r => r.BudgetID, r => r.TotalApproved);
+
+            // ──────────────────────────────────────────────
             // 3. Compute variance for each budget line
             // ──────────────────────────────────────────────
             var varianceResults = budgets.Select(b =>
             {
                 decimal totalExpenses = expenseDict.GetValueOrDefault(b.BudgetID, 0m);
+                decimal totalApproved = requestDict.GetValueOrDefault(b.BudgetID, 0m);
                 decimal variance = b.Amount - totalExpenses;
+                decimal remainingBudget = b.Amount - totalExpenses;
+                decimal utilization = b.Amount > 0 ? (totalExpenses / b.Amount) * 100 : 0m;
 
                 string status;
                 if (totalExpenses > b.Amount)
@@ -94,8 +116,11 @@ namespace FinSight.Controllers
                     DepartmentName = b.Department?.DepartmentName ?? "Unknown",
                     Category = b.Category,
                     BudgetAmount = b.Amount,
+                    TotalApprovedRequests = totalApproved,
                     TotalExpenses = totalExpenses,
+                    RemainingBudget = remainingBudget,
                     Variance = variance,
+                    BudgetUtilizationPercentage = utilization,
                     Status = status,
                     Year = b.Year
                 };

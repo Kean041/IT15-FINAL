@@ -27,6 +27,12 @@ namespace FinSight.Models
         [Column("CreatedAt")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? AppliedInflation { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? AppliedExchangeRate { get; set; }
+
         // Navigation Properties
         [ForeignKey("TenantID")]
         public Tenant? Tenant { get; set; }
