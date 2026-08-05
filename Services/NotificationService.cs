@@ -1,6 +1,7 @@
 using FinSight.Data;
 using FinSight.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,10 +12,12 @@ namespace FinSight.Services
     public class NotificationService
     {
         private readonly FinSightDbContext _context;
+        private readonly ILogger<NotificationService> _logger;
 
-        public NotificationService(FinSightDbContext context)
+        public NotificationService(FinSightDbContext context, ILogger<NotificationService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task CreateNotificationAsync(int? tenantId, int? userId, string type, string title, string message, string? redirectUrl = null)
@@ -35,8 +38,16 @@ namespace FinSight.Services
                 IsRead = false
             };
 
-            _context.Notifications.Add(notification);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.Notifications.Add(notification);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _context.Entry(notification).State = EntityState.Detached;
+                _logger.LogError(ex, "Notification creation failed for title {Title}.", title);
+            }
         }
 
         public async Task CreateTenantBroadcastAsync(int tenantId, string type, string title, string message, string? redirectUrl = null)
@@ -63,8 +74,22 @@ namespace FinSight.Services
                 IsRead = false
             });
 
-            _context.Notifications.AddRange(notifications);
-            await _context.SaveChangesAsync();
+            var notificationList = notifications.ToList();
+
+            try
+            {
+                _context.Notifications.AddRange(notificationList);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                foreach (var notification in notificationList)
+                {
+                    _context.Entry(notification).State = EntityState.Detached;
+                }
+
+                _logger.LogError(ex, "Tenant notification broadcast failed for tenant {TenantID}.", tenantId);
+            }
         }
 
         public async Task<int> GetUnreadCountAsync(int? tenantId, int? userId, int roleId)
