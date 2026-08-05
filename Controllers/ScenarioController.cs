@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Data;
+using System.Data.Common;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -41,6 +43,16 @@ namespace FinSight.Controllers
 
             try
             {
+            if (!HttpContext.Items.ContainsKey("__UseLegacyScenarioPlanning"))
+            {
+                return await RenderScenarioPlanningCompatibilityAsync(
+                    searchString,
+                    periodFilter,
+                    page,
+                    tenantFilter,
+                    pageSize);
+            }
+
             var query = _context.Scenarios
                 .AsNoTracking()
                 .Include(s => s.ScenarioDetails)
@@ -200,7 +212,405 @@ namespace FinSight.Controllers
             ViewBag.CanWrite = CanWriteFinancials;
             ViewBag.CanDelete = CanDeleteRecords;
             ViewBag.RoleID = CurrentRoleID;
-            TempData["Error"] = "Scenario data is temporarily unavailable while the hosted database schema is being repaired.";
+        }
+
+        private async Task<IActionResult> RenderScenarioPlanningCompatibilityAsync(
+            string searchString,
+            string periodFilter,
+            int page,
+            int? tenantFilter,
+            int pageSize)
+        {
+            await EnsureFinanceSchemaBestEffortAsync();
+
+            if (page < 1) page = 1;
+
+            var allResults = await LoadScenarioRowsAsync(tenantFilter, searchString, periodFilter);
+            var detailRows = await LoadScenarioDetailRowsAsync(tenantFilter);
+            var detailLookup = detailRows
+                .GroupBy(d => d.ScenarioID)
+                .ToDictionary(group => group.Key, group => group.ToList());
+
+            foreach (var scenario in allResults)
+            {
+                scenario.ScenarioDetails = detailLookup.TryGetValue(scenario.ScenarioID, out var scenarioDetails)
+                    ? scenarioDetails
+                    : new List<ScenarioDetail>();
+            }
+
+            await ApplyScenarioCreatorNamesBestEffortAsync(allResults, tenantFilter);
+
+            var totalCount = allResults.Count;
+            var totalAdjusted = allResults.SelectMany(s => s.ScenarioDetails).Sum(sd => sd.AdjustedAmount);
+            var deptsCovered = allResults.SelectMany(s => s.ScenarioDetails)
+                .Select(sd => sd.DepartmentID)
+                .Distinct()
+                .Count();
+
+            ViewBag.TotalScenarios = totalCount;
+            ViewBag.TotalAdjusted = totalAdjusted;
+            ViewBag.DeptsCovered = deptsCovered;
+
+            var budgetRows = await LoadScenarioBudgetRowsAsync(tenantFilter);
+            var departmentNames = await LoadDepartmentNameLookupAsync(tenantFilter);
+
+            var deptNames = allResults
+                .SelectMany(s => s.ScenarioDetails)
+                .Select(sd => departmentNames.GetValueOrDefault(sd.DepartmentID))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Union(budgetRows
+                    .Select(b => b.DepartmentName)
+                    .Where(name => !string.IsNullOrWhiteSpace(name)))
+                .Cast<string>()
+                .Distinct()
+                .OrderBy(name => name)
+                .ToList();
+
+            var chartOriginals = new List<decimal>();
+            var chartAdjusteds = new List<decimal>();
+
+            foreach (var departmentName in deptNames)
+            {
+                chartOriginals.Add(budgetRows
+                    .Where(b => b.DepartmentName == departmentName)
+                    .Sum(b => b.Amount));
+
+                chartAdjusteds.Add(allResults
+                    .SelectMany(s => s.ScenarioDetails)
+                    .Where(sd => departmentNames.GetValueOrDefault(sd.DepartmentID) == departmentName)
+                    .Sum(sd => sd.AdjustedAmount));
+            }
+
+            ViewBag.ChartLabels = JsonSerializer.Serialize(deptNames);
+            ViewBag.ChartOriginals = JsonSerializer.Serialize(chartOriginals);
+            ViewBag.ChartAdjusteds = JsonSerializer.Serialize(chartAdjusteds);
+
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            if (totalPages == 0) totalPages = 1;
+            if (page > totalPages) page = totalPages;
+
+            var pagedData = allResults
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            ViewBag.CurrentSearch = searchString;
+            ViewBag.CurrentPeriod = periodFilter;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            ViewBag.Budgets = budgetRows.Select(b => new SelectListItem
+            {
+                Value = b.BudgetID.ToString(),
+                Text = $"{b.DepartmentName} - {b.Category} (PHP {b.Amount:N0})"
+            }).ToList();
+            ViewBag.CanWrite = CanWriteFinancials;
+            ViewBag.CanDelete = CanDeleteRecords;
+            ViewBag.RoleID = CurrentRoleID;
+
+            return View(pagedData);
+        }
+
+        private async Task EnsureFinanceSchemaBestEffortAsync()
+        {
+            try
+            {
+                await DbInitializer.EnsureExpenseSchemaAsync(_context, _logger);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Finance schema repair failed before loading scenario planning; continuing with compatibility queries.");
+            }
+        }
+
+        private async Task<List<Scenario>> LoadScenarioRowsAsync(int? tenantFilter, string searchString, string periodFilter)
+        {
+            const string sql = @"
+                SELECT
+                    ScenarioID,
+                    ScenarioName,
+                    [Description],
+                    TenantID,
+                    CreatedBy,
+                    CreatedAt,
+                    AppliedInflation,
+                    AppliedExchangeRate
+                FROM Scenarios
+                WHERE (@TenantID IS NULL OR TenantID = @TenantID)
+                  AND (
+                        @Search IS NULL
+                        OR ScenarioName LIKE @Search
+                        OR [Description] LIKE @Search
+                  )
+                  AND (@PeriodStart IS NULL OR CreatedAt >= @PeriodStart)
+                ORDER BY CreatedAt DESC, ScenarioID DESC";
+
+            var searchTerm = string.IsNullOrWhiteSpace(searchString) ? null : $"%{searchString.Trim()}%";
+            DateTime? periodStart = periodFilter switch
+            {
+                "Day" => DateTime.Today,
+                "Week" => DateTime.Now.AddDays(-7),
+                "Month" => DateTime.Now.AddMonths(-1),
+                _ => null
+            };
+
+            return await ScenarioQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+                AddParameter(command, "@Search", searchTerm);
+                AddParameter(command, "@PeriodStart", periodStart);
+            }, reader => new Scenario
+            {
+                ScenarioID = GetInt32(reader, "ScenarioID"),
+                ScenarioName = GetString(reader, "ScenarioName", "Scenario"),
+                Description = GetStringOrNull(reader, "Description"),
+                TenantID = GetInt32(reader, "TenantID"),
+                CreatedBy = GetInt32(reader, "CreatedBy"),
+                CreatedAt = GetDateTime(reader, "CreatedAt", DateTime.Now),
+                AppliedInflation = GetNullableDecimal(reader, "AppliedInflation"),
+                AppliedExchangeRate = GetNullableDecimal(reader, "AppliedExchangeRate"),
+                ScenarioDetails = new List<ScenarioDetail>()
+            });
+        }
+
+        private async Task<List<ScenarioDetail>> LoadScenarioDetailRowsAsync(int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT
+                    ScenarioDetailID,
+                    ScenarioID,
+                    BudgetID,
+                    DepartmentID,
+                    AdjustedAmount,
+                    TenantID,
+                    CreatedAt
+                FROM ScenarioDetails
+                WHERE (@TenantID IS NULL OR TenantID = @TenantID)";
+
+            return await ScenarioQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader => new ScenarioDetail
+            {
+                ScenarioDetailID = GetInt32(reader, "ScenarioDetailID"),
+                ScenarioID = GetInt32(reader, "ScenarioID"),
+                BudgetID = GetInt32(reader, "BudgetID"),
+                DepartmentID = GetInt32(reader, "DepartmentID"),
+                AdjustedAmount = GetDecimal(reader, "AdjustedAmount"),
+                TenantID = GetInt32(reader, "TenantID"),
+                CreatedAt = GetDateTime(reader, "CreatedAt", DateTime.Now)
+            });
+        }
+
+        private async Task<List<ScenarioBudgetRow>> LoadScenarioBudgetRowsAsync(int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT
+                    b.BudgetID,
+                    b.DepartmentID,
+                    b.Category,
+                    b.Amount,
+                    COALESCE(d.DepartmentName, 'General') AS DepartmentName
+                FROM Budgets b
+                LEFT JOIN Departments d ON d.DepartmentID = b.DepartmentID
+                WHERE (@TenantID IS NULL OR b.TenantID = @TenantID)
+                ORDER BY COALESCE(d.DepartmentName, 'General'), b.Category";
+
+            return await ScenarioQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader => new ScenarioBudgetRow
+            {
+                BudgetID = GetInt32(reader, "BudgetID"),
+                DepartmentID = GetInt32(reader, "DepartmentID"),
+                Category = GetString(reader, "Category", "General"),
+                Amount = GetDecimal(reader, "Amount"),
+                DepartmentName = GetString(reader, "DepartmentName", "General")
+            });
+        }
+
+        private async Task<Dictionary<int, string>> LoadDepartmentNameLookupAsync(int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT DepartmentID, DepartmentName
+                FROM Departments
+                WHERE (@TenantID IS NULL OR TenantID = @TenantID)";
+
+            var rows = await ScenarioQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader => new KeyValuePair<int, string>(
+                GetInt32(reader, "DepartmentID"),
+                GetString(reader, "DepartmentName", "General")));
+
+            return rows
+                .GroupBy(row => row.Key)
+                .ToDictionary(group => group.Key, group => group.First().Value);
+        }
+
+        private async Task ApplyScenarioCreatorNamesBestEffortAsync(List<Scenario> scenarios, int? tenantFilter)
+        {
+            if (scenarios.Count == 0)
+                return;
+
+            try
+            {
+                var names = await LoadScenarioCreatorNamesAsync(tenantFilter);
+                foreach (var scenario in scenarios)
+                {
+                    if (!names.TryGetValue(scenario.CreatedBy, out var fullName))
+                        continue;
+
+                    scenario.Creator = new User
+                    {
+                        UserID = scenario.CreatedBy,
+                        FullName = fullName
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Scenario creator names could not be loaded; rendering scenarios without creator names.");
+            }
+        }
+
+        private async Task<Dictionary<int, string>> LoadScenarioCreatorNamesAsync(int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT UserID, FullName
+                FROM Users
+                WHERE (@TenantID IS NULL OR TenantID = @TenantID)";
+
+            var rows = await ScenarioQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader => new KeyValuePair<int, string>(
+                GetInt32(reader, "UserID"),
+                GetString(reader, "FullName", string.Empty)));
+
+            return rows
+                .Where(row => !string.IsNullOrWhiteSpace(row.Value))
+                .GroupBy(row => row.Key)
+                .ToDictionary(group => group.Key, group => group.First().Value);
+        }
+
+        private async Task<List<object>> LoadScenarioComparisonRowsAsync(int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT
+                    COALESCE(s.ScenarioName, 'N/A') AS ScenarioName,
+                    COALESCE(d.DepartmentName, 'N/A') AS Department,
+                    COALESCE(b.Category, 'N/A') AS BudgetCategory,
+                    COALESCE(b.Amount, 0) AS OriginalAmount,
+                    sd.AdjustedAmount,
+                    sd.CreatedAt
+                FROM ScenarioDetails sd
+                LEFT JOIN Scenarios s ON s.ScenarioID = sd.ScenarioID
+                LEFT JOIN Departments d ON d.DepartmentID = sd.DepartmentID
+                LEFT JOIN Budgets b ON b.BudgetID = sd.BudgetID
+                WHERE (@TenantID IS NULL OR sd.TenantID = @TenantID)
+                ORDER BY sd.CreatedAt DESC, sd.ScenarioDetailID DESC";
+
+            return await ScenarioQueryAsync<object>(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader =>
+            {
+                var originalAmount = GetDecimal(reader, "OriginalAmount");
+                var adjustedAmount = GetDecimal(reader, "AdjustedAmount");
+
+                return new
+                {
+                    ScenarioName = GetString(reader, "ScenarioName", "N/A"),
+                    Department = GetString(reader, "Department", "N/A"),
+                    BudgetCategory = GetString(reader, "BudgetCategory", "N/A"),
+                    OriginalAmount = originalAmount,
+                    AdjustedAmount = adjustedAmount,
+                    Difference = adjustedAmount - originalAmount,
+                    CreatedAt = GetDateTime(reader, "CreatedAt", DateTime.Now)
+                };
+            });
+        }
+
+        private async Task<List<T>> ScenarioQueryAsync<T>(string sql, Action<DbCommand> configure, Func<DbDataReader, T> map)
+        {
+            var results = new List<T>();
+            var connection = _context.Database.GetDbConnection();
+            var shouldClose = connection.State != ConnectionState.Open;
+
+            if (shouldClose)
+                await connection.OpenAsync();
+
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = sql;
+                configure(command);
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    results.Add(map(reader));
+                }
+            }
+            finally
+            {
+                if (shouldClose)
+                    await connection.CloseAsync();
+            }
+
+            return results;
+        }
+
+        private static void AddParameter(DbCommand command, string name, object? value)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.Value = value ?? DBNull.Value;
+            command.Parameters.Add(parameter);
+        }
+
+        private static int GetInt32(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? 0 : Convert.ToInt32(reader.GetValue(ordinal));
+        }
+
+        private static decimal GetDecimal(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? 0m : Convert.ToDecimal(reader.GetValue(ordinal));
+        }
+
+        private static decimal? GetNullableDecimal(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? null : Convert.ToDecimal(reader.GetValue(ordinal));
+        }
+
+        private static DateTime GetDateTime(DbDataReader reader, string columnName, DateTime defaultValue)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? defaultValue : Convert.ToDateTime(reader.GetValue(ordinal));
+        }
+
+        private static string GetString(DbDataReader reader, string columnName, string defaultValue)
+        {
+            return GetStringOrNull(reader, columnName) ?? defaultValue;
+        }
+
+        private static string? GetStringOrNull(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? null : Convert.ToString(reader.GetValue(ordinal));
+        }
+
+        private sealed class ScenarioBudgetRow
+        {
+            public int BudgetID { get; set; }
+            public int DepartmentID { get; set; }
+            public string Category { get; set; } = string.Empty;
+            public decimal Amount { get; set; }
+            public string DepartmentName { get; set; } = "General";
         }
 
         private async Task PopulateScenarioCreatorsAsync(List<Scenario> scenarios)
@@ -446,6 +856,21 @@ namespace FinSight.Controllers
                 return Unauthorized();
 
             int? tenantFilter = GetTenantFilter();
+
+            if (!HttpContext.Items.ContainsKey("__UseLegacyScenarioComparisonData"))
+            {
+                try
+                {
+                    await EnsureFinanceSchemaBestEffortAsync();
+                    var compatibleDetails = await LoadScenarioComparisonRowsAsync(tenantFilter);
+                    return Json(compatibleDetails);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Scenario comparison JSON failed for tenant {TenantID}.", tenantFilter);
+                    return Json(Array.Empty<object>());
+                }
+            }
 
             var query = _context.ScenarioDetails
                 .AsNoTracking()
