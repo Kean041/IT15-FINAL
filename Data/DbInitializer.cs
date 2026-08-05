@@ -373,6 +373,7 @@ namespace FinSight.Data
                     PasswordHash = PasswordHelper.HashPassword(adminPassword),
                     RoleID = Roles.Admin,
                     IsArchived = false,
+                    IsTwoFactorEnabled = false,
                     FailedLoginAttempts = 0,
                     LockoutEnd = null,
                     CreatedAt = DateTime.Now
@@ -387,6 +388,7 @@ namespace FinSight.Data
                 admin.PasswordHash = PasswordHelper.HashPassword(adminPassword);
                 admin.RoleID = Roles.Admin;
                 admin.IsArchived = false;
+                admin.IsTwoFactorEnabled = false;
                 admin.FailedLoginAttempts = 0;
                 admin.LockoutEnd = null;
                 admin.CreatedAt ??= DateTime.Now;
