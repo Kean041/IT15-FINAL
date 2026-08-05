@@ -140,6 +140,20 @@ namespace FinSight.Controllers
             if (!ModelState.IsValid)
                 return View(model);
 
+            try
+            {
+                return await ProcessLoginAsync(model);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Login failed with a server error for {Email}.", model.Email);
+                ViewBag.Error = "Unable to sign in right now. Please check the deployed database configuration and try again.";
+                return View(model);
+            }
+        }
+
+        private async Task<IActionResult> ProcessLoginAsync(LoginViewModel model)
+        {
             // Find user by email only (don't expose whether email exists)
             var user = await _context.Users
                 .Include(u => u.Tenant)
@@ -463,8 +477,8 @@ namespace FinSight.Controllers
         private void SetUserSession(User user, Tenant? tenant)
         {
             HttpContext.Session.SetInt32("UserID", user.UserID);
-            HttpContext.Session.SetString("FullName", user.FullName);
-            HttpContext.Session.SetString("Email", user.Email);
+            HttpContext.Session.SetString("FullName", string.IsNullOrWhiteSpace(user.FullName) ? "Admin User" : user.FullName);
+            HttpContext.Session.SetString("Email", user.Email ?? string.Empty);
             HttpContext.Session.SetInt32("TenantID", tenant?.TenantID ?? 0);
             HttpContext.Session.SetString("CompanyName", tenant?.CompanyName ?? "");
             HttpContext.Session.SetString("SubscriptionStatus", tenant?.SubscriptionStatus ?? "Pending");

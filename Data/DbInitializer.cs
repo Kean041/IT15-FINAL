@@ -48,6 +48,18 @@ namespace FinSight.Data
 
                     IF COL_LENGTH('Users', 'TwoFactorSecretKey') IS NULL
                         ALTER TABLE Users ADD TwoFactorSecretKey NVARCHAR(500) NULL;
+
+                    IF COL_LENGTH('Users', 'FullName') IS NOT NULL
+                        UPDATE Users SET FullName = COALESCE(NULLIF(FullName, ''), Email, 'Admin User') WHERE FullName IS NULL OR FullName = '';
+
+                    IF COL_LENGTH('Users', 'IsArchived') IS NOT NULL
+                        UPDATE Users SET IsArchived = 0 WHERE IsArchived IS NULL;
+
+                    IF COL_LENGTH('Users', 'FailedLoginAttempts') IS NOT NULL
+                        UPDATE Users SET FailedLoginAttempts = 0 WHERE FailedLoginAttempts IS NULL;
+
+                    IF COL_LENGTH('Users', 'IsTwoFactorEnabled') IS NOT NULL
+                        UPDATE Users SET IsTwoFactorEnabled = 0 WHERE IsTwoFactorEnabled IS NULL;
                 END
 
                 IF OBJECT_ID('AuditLogs', 'U') IS NULL
@@ -297,12 +309,92 @@ namespace FinSight.Data
                     logger.LogInformation("Super Admin already exists. Skipping seed.");
                 }
 
+                await SeedConfiguredAdminAsync(context, logger, configuration);
                 await EnsureExpenseSchemaAsync(context, logger);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "An error occurred while seeding the database.");
             }
+        }
+
+        private static async Task SeedConfiguredAdminAsync(FinSightDbContext context, ILogger logger, IConfiguration configuration)
+        {
+            var adminEmail = configuration["SeedUsers:AdminEmail"];
+            var adminPassword = configuration["SeedUsers:AdminPassword"];
+
+            if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword))
+            {
+                logger.LogInformation("Configured Admin seed skipped because SeedUsers:AdminEmail or SeedUsers:AdminPassword is not configured.");
+                return;
+            }
+
+            var companyName = configuration["SeedUsers:AdminCompanyName"];
+            if (string.IsNullOrWhiteSpace(companyName))
+            {
+                companyName = "FinSight Demo";
+            }
+
+            var adminName = configuration["SeedUsers:AdminName"];
+            if (string.IsNullOrWhiteSpace(adminName))
+            {
+                adminName = "Demo Admin";
+            }
+
+            var tenant = await context.Tenants.FirstOrDefaultAsync(t => t.CompanyName == companyName);
+            if (tenant == null)
+            {
+                tenant = new Tenant
+                {
+                    CompanyName = companyName,
+                    CreatedDate = DateTime.Now,
+                    SubscriptionPlan = "Enterprise",
+                    SubscriptionStatus = "Active"
+                };
+
+                context.Tenants.Add(tenant);
+                await context.SaveChangesAsync();
+            }
+            else
+            {
+                tenant.SubscriptionPlan ??= "Enterprise";
+                tenant.SubscriptionStatus = "Active";
+                context.Tenants.Update(tenant);
+            }
+
+            var admin = await context.Users.FirstOrDefaultAsync(u => u.Email == adminEmail);
+            if (admin == null)
+            {
+                admin = new User
+                {
+                    TenantID = tenant.TenantID,
+                    FullName = adminName,
+                    Email = adminEmail,
+                    PasswordHash = PasswordHelper.HashPassword(adminPassword),
+                    RoleID = Roles.Admin,
+                    IsArchived = false,
+                    FailedLoginAttempts = 0,
+                    LockoutEnd = null,
+                    CreatedAt = DateTime.Now
+                };
+
+                context.Users.Add(admin);
+            }
+            else
+            {
+                admin.TenantID = tenant.TenantID;
+                admin.FullName = string.IsNullOrWhiteSpace(admin.FullName) ? adminName : admin.FullName;
+                admin.PasswordHash = PasswordHelper.HashPassword(adminPassword);
+                admin.RoleID = Roles.Admin;
+                admin.IsArchived = false;
+                admin.FailedLoginAttempts = 0;
+                admin.LockoutEnd = null;
+                admin.CreatedAt ??= DateTime.Now;
+                context.Users.Update(admin);
+            }
+
+            await context.SaveChangesAsync();
+            logger.LogInformation("Configured Admin account is ready for {AdminEmail}.", adminEmail);
         }
     }
 }
