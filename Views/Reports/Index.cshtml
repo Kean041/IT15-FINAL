@@ -23,7 +23,7 @@
                 </div>
                 <h5 class="fw-bold text-dark mb-2">Financial Summary</h5>
                 <p class="text-muted small mb-4">Aggregated view of budgets, expenses, and pending requests across departments.</p>
-                <a asp-action="FinancialSummary" class="btn btn-primary w-100 fw-medium" style="border-radius:8px;">View Report</a>
+                <a asp-controller="Reports" asp-action="FinancialSummary" class="btn btn-primary w-100 fw-medium" style="border-radius:8px;">View Report</a>
             </div>
         </div>
     </div>
@@ -39,7 +39,7 @@
                 </div>
                 <h5 class="fw-bold text-dark mb-2">Variance Analysis</h5>
                 <p class="text-muted small mb-4">Compare budgets, actual spending, and forecasted amounts to identify variances.</p>
-                <a asp-action="VarianceReport" class="btn btn-info text-white w-100 fw-medium" style="border-radius:8px;">View Report</a>
+                <a asp-controller="Reports" asp-action="VarianceReport" class="btn btn-info text-white w-100 fw-medium" style="border-radius:8px;">View Report</a>
             </div>
         </div>
     </div>
@@ -71,7 +71,7 @@
                 </div>
                 <h5 class="fw-bold text-dark mb-2">Actual Expenses</h5>
                 <p class="text-muted small mb-4">Comprehensive history of all recorded expenses and actual spending.</p>
-                <a asp-action="ExpensesReport" class="btn btn-danger w-100 fw-medium" style="border-radius:8px;">View Report</a>
+                <a asp-controller="Reports" asp-action="ExpensesReport" class="btn btn-danger w-100 fw-medium" style="border-radius:8px;">View Report</a>
             </div>
         </div>
     </div>

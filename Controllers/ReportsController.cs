@@ -49,15 +49,15 @@ namespace FinSight.Controllers
             int selectedYear = year ?? DateTime.Now.Year;
 
             var budgetsQuery = ApplyTenantFilter(_context.Budgets)
-                .Include(b => b.Department)
+                .AsNoTracking()
                 .Where(b => b.Year == selectedYear);
 
             var expensesQuery = ApplyTenantFilter(_context.Expenses)
-                .Include(e => e.Department)
+                .AsNoTracking()
                 .Where(e => e.ExpenseDate.Year == selectedYear);
 
             var requestsQuery = ApplyTenantFilter(_context.BudgetRequests)
-                .Include(r => r.Department)
+                .AsNoTracking()
                 .Where(r => r.DateNeeded.Year == selectedYear && r.Status == "Pending");
 
             if (IsDeptHead)
@@ -67,9 +67,32 @@ namespace FinSight.Controllers
                 requestsQuery = requestsQuery.Where(r => r.DepartmentID == CurrentDepartmentID);
             }
 
-            var budgets = await budgetsQuery.ToListAsync();
-            var expenses = await expensesQuery.ToListAsync();
-            var requests = await requestsQuery.ToListAsync();
+            var budgets = await budgetsQuery
+                .Select(b => new
+                {
+                    b.DepartmentID,
+                    b.Amount,
+                    DepartmentName = b.Department != null ? b.Department.DepartmentName : "N/A"
+                })
+                .ToListAsync();
+
+            var expenses = await expensesQuery
+                .Select(e => new
+                {
+                    e.DepartmentID,
+                    e.Amount,
+                    DepartmentName = e.Department != null ? e.Department.DepartmentName : "N/A"
+                })
+                .ToListAsync();
+
+            var requests = await requestsQuery
+                .Select(r => new
+                {
+                    r.DepartmentID,
+                    r.RequestedAmount,
+                    DepartmentName = r.Department != null ? r.Department.DepartmentName : "N/A"
+                })
+                .ToListAsync();
 
             var vm = new FinancialSummaryReportViewModel
             {
@@ -79,16 +102,27 @@ namespace FinSight.Controllers
                 TotalPendingRequests = requests.Sum(r => r.RequestedAmount)
             };
 
-            var depts = budgets.Select(b => b.Department?.DepartmentName).Distinct().ToList();
-            foreach (var d in depts)
+            var departments = budgets
+                .Select(b => new { b.DepartmentID, b.DepartmentName })
+                .Union(expenses.Select(e => new { e.DepartmentID, e.DepartmentName }))
+                .Union(requests.Select(r => new { r.DepartmentID, r.DepartmentName }))
+                .GroupBy(d => d.DepartmentID)
+                .Select(g => new
+                {
+                    DepartmentID = g.Key,
+                    DepartmentName = g.Select(d => d.DepartmentName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "N/A"
+                })
+                .OrderBy(d => d.DepartmentName)
+                .ToList();
+
+            foreach (var department in departments)
             {
-                if (d == null) continue;
                 vm.DepartmentSummaries.Add(new DepartmentSummary
                 {
-                    DepartmentName = d,
-                    Budget = budgets.Where(b => b.Department?.DepartmentName == d).Sum(b => b.Amount),
-                    Expenses = expenses.Where(e => e.Department?.DepartmentName == d).Sum(e => e.Amount),
-                    PendingRequests = requests.Where(r => r.Department?.DepartmentName == d).Sum(r => r.RequestedAmount)
+                    DepartmentName = department.DepartmentName,
+                    Budget = budgets.Where(b => b.DepartmentID == department.DepartmentID).Sum(b => b.Amount),
+                    Expenses = expenses.Where(e => e.DepartmentID == department.DepartmentID).Sum(e => e.Amount),
+                    PendingRequests = requests.Where(r => r.DepartmentID == department.DepartmentID).Sum(r => r.RequestedAmount)
                 });
             }
 
@@ -241,13 +275,50 @@ namespace FinSight.Controllers
             int selectedYear = year ?? DateTime.Now.Year;
 
             var query = ApplyTenantFilter(_context.Expenses)
-                .Include(e => e.Department)
-                .Include(e => e.Budget)
+                .AsNoTracking()
                 .Where(e => e.ExpenseDate.Year == selectedYear);
 
             if (IsDeptHead) query = query.Where(e => e.DepartmentID == CurrentDepartmentID);
 
-            var list = await query.OrderByDescending(e => e.ExpenseDate).ToListAsync();
+            var expenseRows = await query
+                .OrderByDescending(e => e.ExpenseDate)
+                .Select(e => new
+                {
+                    e.ExpenseID,
+                    e.BudgetID,
+                    e.DepartmentID,
+                    e.TenantID,
+                    e.ExpenseTitle,
+                    e.Amount,
+                    e.ExpenseDate,
+                    e.Status,
+                    DepartmentName = e.Department != null ? e.Department.DepartmentName : "N/A",
+                    BudgetCategory = e.Budget != null ? e.Budget.Category : "N/A"
+                })
+                .ToListAsync();
+
+            var list = expenseRows.Select(e => new Expense
+            {
+                ExpenseID = e.ExpenseID,
+                BudgetID = e.BudgetID,
+                DepartmentID = e.DepartmentID,
+                TenantID = e.TenantID,
+                ExpenseTitle = e.ExpenseTitle ?? string.Empty,
+                Amount = e.Amount,
+                ExpenseDate = e.ExpenseDate,
+                Status = e.Status ?? "Recorded",
+                Department = new Department
+                {
+                    DepartmentID = e.DepartmentID,
+                    DepartmentName = e.DepartmentName ?? "N/A"
+                },
+                Budget = new Budget
+                {
+                    BudgetID = e.BudgetID,
+                    Category = e.BudgetCategory ?? "N/A"
+                }
+            }).ToList();
+
             var vm = new ExpensesReportViewModel
             {
                 Year = selectedYear,
@@ -255,13 +326,18 @@ namespace FinSight.Controllers
                 TotalActualSpending = list.Sum(e => e.Amount)
             };
 
-            var depts = list.Select(e => e.Department?.DepartmentName).Distinct().ToList();
+            var depts = list
+                .Select(e => e.Department?.DepartmentName)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct()
+                .OrderBy(name => name)
+                .ToList();
+
             foreach (var d in depts)
             {
-                if (d == null) continue;
                 vm.DepartmentExpenses.Add(new DepartmentExpenseSummary
                 {
-                    DepartmentName = d,
+                    DepartmentName = d!,
                     TotalExpenses = list.Where(e => e.Department?.DepartmentName == d).Sum(e => e.Amount)
                 });
             }
@@ -297,32 +373,55 @@ namespace FinSight.Controllers
             int selectedYear = year ?? DateTime.Now.Year;
 
             var budgets = await ApplyTenantFilter(_context.Budgets)
-                .Include(b => b.Department)
-                .Where(b => b.Year == selectedYear).ToListAsync();
+                .AsNoTracking()
+                .Where(b => b.Year == selectedYear)
+                .Select(b => new
+                {
+                    b.BudgetID,
+                    b.DepartmentID,
+                    b.Category,
+                    b.Amount,
+                    DepartmentName = b.Department != null ? b.Department.DepartmentName : "N/A"
+                })
+                .ToListAsync();
                 
             var expenses = await ApplyTenantFilter(_context.Expenses)
-                .Where(e => e.ExpenseDate.Year == selectedYear).ToListAsync();
+                .AsNoTracking()
+                .Where(e => e.ExpenseDate.Year == selectedYear)
+                .GroupBy(e => e.BudgetID)
+                .Select(g => new
+                {
+                    BudgetID = g.Key,
+                    Total = g.Sum(e => e.Amount)
+                })
+                .ToDictionaryAsync(g => g.BudgetID, g => g.Total);
                 
             var forecasts = await ApplyTenantFilter(_context.Forecasts)
-                .Where(f => f.Year == selectedYear).ToListAsync();
+                .AsNoTracking()
+                .Where(f => f.Year == selectedYear && f.ForecastType == "Base Case")
+                .GroupBy(f => f.BudgetID)
+                .Select(g => new
+                {
+                    BudgetID = g.Key,
+                    Total = g.Sum(f => f.PredictedAmount)
+                })
+                .ToDictionaryAsync(g => g.BudgetID, g => g.Total);
 
             if (IsDeptHead)
             {
                 budgets = budgets.Where(b => b.DepartmentID == CurrentDepartmentID).ToList();
-                expenses = expenses.Where(e => e.DepartmentID == CurrentDepartmentID).ToList();
-                forecasts = forecasts.Where(f => f.DepartmentID == CurrentDepartmentID).ToList();
             }
 
             var vm = new VarianceReportViewModel { Year = selectedYear };
 
             foreach (var budget in budgets)
             {
-                var actuals = expenses.Where(e => e.BudgetID == budget.BudgetID).Sum(e => e.Amount);
-                var forecast = forecasts.Where(f => f.BudgetID == budget.BudgetID && f.ForecastType == "Base Case").Select(f => f.PredictedAmount).FirstOrDefault();
+                var actuals = expenses.GetValueOrDefault(budget.BudgetID);
+                var forecast = forecasts.GetValueOrDefault(budget.BudgetID);
 
                 vm.Variances.Add(new VarianceItem
                 {
-                    DepartmentName = budget.Department?.DepartmentName ?? "-",
+                    DepartmentName = budget.DepartmentName ?? "-",
                     Category = budget.Category,
                     BudgetedAmount = budget.Amount,
                     ActualAmount = actuals,
