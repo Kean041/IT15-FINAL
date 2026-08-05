@@ -16,6 +16,8 @@ dotnet user-secrets set "Stripe:WebhookSecret" "<value>"
 dotnet user-secrets set "Cloudflare:TurnstileSiteKey" "<value>"
 dotnet user-secrets set "Cloudflare:TurnstileSecretKey" "<value>"
 dotnet user-secrets set "SeedUsers:SuperAdminPassword" "<value>"
+dotnet user-secrets set "SeedUsers:AdminEmail" "<value>"
+dotnet user-secrets set "SeedUsers:AdminPassword" "<value>"
 ```
 
 For deployment, configure these environment variables in the hosting provider:
@@ -31,5 +33,22 @@ Stripe__WebhookSecret
 Cloudflare__TurnstileSiteKey
 Cloudflare__TurnstileSecretKey
 SeedUsers__SuperAdminPassword
+SeedUsers__AdminEmail
+SeedUsers__AdminPassword
 ```
+
+## MonsterASP.NET GitHub Actions secrets
+
+The deployment workflow requires these repository secrets:
+
+```text
+WEBSITE_NAME
+SERVER_USERNAME
+SERVER_PASSWORD
+DB_CONNECTION_STRING
+ADMIN_EMAIL
+ADMIN_PASSWORD
+```
+
+`DB_CONNECTION_STRING` must be the SQL Server connection string from the MonsterASP.NET control panel. The workflow injects it into the published `web.config` as `ConnectionStrings__DefaultConnection`.
 
