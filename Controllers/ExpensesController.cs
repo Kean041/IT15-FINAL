@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Data;
+using System.Data.Common;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -40,6 +43,19 @@ namespace FinSight.Controllers
 
             try
             {
+                if (!HttpContext.Items.ContainsKey("__UseLegacyExpenseIndex"))
+                {
+                    return await RenderExpenseIndexCompatibilityAsync(
+                        roleId,
+                        tenantFilter,
+                        departmentId,
+                        status,
+                        startDate,
+                        endDate,
+                        search,
+                        page);
+                }
+
             var query = _db.Expenses
                 .AsNoTracking()
                 .AsQueryable();
@@ -237,7 +253,325 @@ namespace FinSight.Controllers
             ViewBag.CurrentEndDate = endDate?.ToString("yyyy-MM-dd");
             ViewBag.CurrentSearch = search;
             ViewBag.Departments = new SelectList(new List<Department>(), "DepartmentID", "DepartmentName", departmentId);
-            TempData["Error"] = "Expense data is temporarily unavailable while the hosted database schema is being repaired.";
+        }
+
+        private async Task<IActionResult> RenderExpenseIndexCompatibilityAsync(
+            int roleId,
+            int? tenantFilter,
+            int? departmentId,
+            string? status,
+            DateTime? startDate,
+            DateTime? endDate,
+            string? search,
+            int page)
+        {
+            await EnsureFinanceSchemaBestEffortAsync();
+
+            var scopedDepartmentId = roleId == Roles.DepartmentHead
+                ? HttpContext.Session.GetInt32("DepartmentID")
+                : departmentId;
+
+            var filteredRows = await LoadExpenseRowsAsync(
+                tenantFilter,
+                scopedDepartmentId,
+                status,
+                startDate,
+                endDate,
+                search);
+
+            var totalExpenses = filteredRows.Sum(e => e.Amount);
+            var totalCount = filteredRows.Count;
+
+            var now = DateTime.Now;
+            var monthlyExpenses = filteredRows
+                .Where(e => e.ExpenseDate.Year == now.Year && e.ExpenseDate.Month == now.Month)
+                .Sum(e => e.Amount);
+
+            var budgetIds = filteredRows
+                .Select(e => e.BudgetID)
+                .Where(id => id > 0)
+                .Distinct()
+                .ToHashSet();
+
+            var totalAllocated = 0m;
+            var totalSpent = 0m;
+            if (budgetIds.Count > 0)
+            {
+                var budgetAmounts = await LoadBudgetAmountsAsync(tenantFilter);
+                var expenseTotalsByBudget = await LoadExpenseTotalsByBudgetAsync(tenantFilter);
+
+                totalAllocated = budgetAmounts
+                    .Where(b => budgetIds.Contains(b.Key))
+                    .Sum(b => b.Value);
+
+                totalSpent = expenseTotalsByBudget
+                    .Where(e => budgetIds.Contains(e.Key))
+                    .Sum(e => e.Value);
+            }
+
+            var remainingBudget = totalAllocated - totalSpent;
+
+            const int pageSize = 15;
+            if (page < 1) page = 1;
+
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+            if (totalPages == 0) totalPages = 1;
+            if (page > totalPages) page = totalPages;
+
+            var items = filteredRows
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            ViewBag.TotalExpenses = totalExpenses;
+            ViewBag.MonthlyExpenses = monthlyExpenses;
+            ViewBag.RemainingBudget = remainingBudget;
+            ViewBag.TotalAllocated = totalAllocated;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            ViewBag.TotalCount = totalCount;
+            ViewBag.RoleID = roleId;
+            ViewBag.CanManage = CanManage;
+            ViewBag.CurrentDepartment = departmentId;
+            ViewBag.CurrentStatus = status;
+            ViewBag.CurrentStartDate = startDate?.ToString("yyyy-MM-dd");
+            ViewBag.CurrentEndDate = endDate?.ToString("yyyy-MM-dd");
+            ViewBag.CurrentSearch = search;
+
+            if (roleId != Roles.DepartmentHead)
+            {
+                var depts = await LoadDepartmentOptionsAsync(tenantFilter);
+                ViewBag.Departments = new SelectList(depts, "DepartmentID", "DepartmentName", departmentId);
+            }
+            else
+            {
+                ViewBag.Departments = new SelectList(new List<Department>(), "DepartmentID", "DepartmentName");
+            }
+
+            return View(items);
+        }
+
+        private async Task EnsureFinanceSchemaBestEffortAsync()
+        {
+            try
+            {
+                await DbInitializer.EnsureExpenseSchemaAsync(_db, _logger);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Finance schema repair failed before loading the expense page; continuing with compatibility queries.");
+            }
+        }
+
+        private async Task<List<Expense>> LoadExpenseRowsAsync(
+            int? tenantFilter,
+            int? departmentId,
+            string? status,
+            DateTime? startDate,
+            DateTime? endDate,
+            string? search)
+        {
+            const string sql = @"
+                SELECT
+                    e.ExpenseID,
+                    e.BudgetRequestID,
+                    e.BudgetID,
+                    e.DepartmentID,
+                    e.TenantID,
+                    e.ExpenseTitle,
+                    e.Category,
+                    e.[Description],
+                    e.Amount,
+                    e.ExpenseDate,
+                    e.[Status],
+                    d.DepartmentName
+                FROM Expenses e
+                LEFT JOIN Departments d ON d.DepartmentID = e.DepartmentID
+                WHERE (@TenantID IS NULL OR e.TenantID = @TenantID)
+                  AND (@DepartmentID IS NULL OR e.DepartmentID = @DepartmentID)
+                  AND (@Status IS NULL OR e.[Status] = @Status)
+                  AND (@StartDate IS NULL OR e.ExpenseDate >= @StartDate)
+                  AND (@EndDate IS NULL OR e.ExpenseDate < @EndDate)
+                  AND (
+                        @Search IS NULL
+                        OR e.ExpenseTitle LIKE @Search
+                        OR e.Category LIKE @Search
+                        OR e.[Description] LIKE @Search
+                  )
+                ORDER BY e.ExpenseDate DESC, e.ExpenseID DESC";
+
+            var searchTerm = string.IsNullOrWhiteSpace(search) ? null : $"%{search.Trim()}%";
+
+            return await ExpenseQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+                AddParameter(command, "@DepartmentID", departmentId.HasValue && departmentId.Value > 0 ? departmentId.Value : null);
+                AddParameter(command, "@Status", string.IsNullOrWhiteSpace(status) ? null : status.Trim());
+                AddParameter(command, "@StartDate", startDate?.Date);
+                AddParameter(command, "@EndDate", endDate?.Date.AddDays(1));
+                AddParameter(command, "@Search", searchTerm);
+            }, reader =>
+            {
+                var departmentName = GetStringOrNull(reader, "DepartmentName");
+                var departmentKey = GetInt32(reader, "DepartmentID");
+                var expenseDate = GetDateTime(reader, "ExpenseDate", DateTime.Now);
+
+                return new Expense
+                {
+                    ExpenseID = GetInt32(reader, "ExpenseID"),
+                    BudgetRequestID = GetNullableInt32(reader, "BudgetRequestID"),
+                    BudgetID = GetInt32(reader, "BudgetID"),
+                    DepartmentID = departmentKey,
+                    TenantID = GetInt32(reader, "TenantID"),
+                    ExpenseTitle = GetString(reader, "ExpenseTitle", "Expense"),
+                    Category = GetString(reader, "Category", "General"),
+                    Description = GetString(reader, "Description", string.Empty),
+                    Amount = GetDecimal(reader, "Amount"),
+                    ExpenseDate = expenseDate,
+                    Year = expenseDate.Year,
+                    Status = GetString(reader, "Status", "Recorded"),
+                    CreatedAt = expenseDate,
+                    Department = string.IsNullOrWhiteSpace(departmentName)
+                        ? null
+                        : new Department
+                        {
+                            DepartmentID = departmentKey,
+                            DepartmentName = departmentName
+                        }
+                };
+            });
+        }
+
+        private async Task<Dictionary<int, decimal>> LoadBudgetAmountsAsync(int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT BudgetID, Amount
+                FROM Budgets
+                WHERE (@TenantID IS NULL OR TenantID = @TenantID)";
+
+            var rows = await ExpenseQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader => new KeyValuePair<int, decimal>(
+                GetInt32(reader, "BudgetID"),
+                GetDecimal(reader, "Amount")));
+
+            return rows
+                .GroupBy(row => row.Key)
+                .ToDictionary(group => group.Key, group => group.First().Value);
+        }
+
+        private async Task<Dictionary<int, decimal>> LoadExpenseTotalsByBudgetAsync(int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT BudgetID, SUM(Amount) AS TotalAmount
+                FROM Expenses
+                WHERE BudgetID > 0
+                  AND (@TenantID IS NULL OR TenantID = @TenantID)
+                GROUP BY BudgetID";
+
+            var rows = await ExpenseQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader => new KeyValuePair<int, decimal>(
+                GetInt32(reader, "BudgetID"),
+                GetDecimal(reader, "TotalAmount")));
+
+            return rows
+                .GroupBy(row => row.Key)
+                .ToDictionary(group => group.Key, group => group.Sum(row => row.Value));
+        }
+
+        private async Task<List<Department>> LoadDepartmentOptionsAsync(int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT DepartmentID, DepartmentName, TenantID
+                FROM Departments
+                WHERE (@TenantID IS NULL OR TenantID = @TenantID)
+                ORDER BY DepartmentName";
+
+            return await ExpenseQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader => new Department
+            {
+                DepartmentID = GetInt32(reader, "DepartmentID"),
+                DepartmentName = GetString(reader, "DepartmentName", "General"),
+                TenantID = GetInt32(reader, "TenantID")
+            });
+        }
+
+        private async Task<List<T>> ExpenseQueryAsync<T>(string sql, Action<DbCommand> configure, Func<DbDataReader, T> map)
+        {
+            var results = new List<T>();
+            var connection = _db.Database.GetDbConnection();
+            var shouldClose = connection.State != ConnectionState.Open;
+
+            if (shouldClose)
+                await connection.OpenAsync();
+
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = sql;
+                configure(command);
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    results.Add(map(reader));
+                }
+            }
+            finally
+            {
+                if (shouldClose)
+                    await connection.CloseAsync();
+            }
+
+            return results;
+        }
+
+        private static void AddParameter(DbCommand command, string name, object? value)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.Value = value ?? DBNull.Value;
+            command.Parameters.Add(parameter);
+        }
+
+        private static int GetInt32(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? 0 : Convert.ToInt32(reader.GetValue(ordinal));
+        }
+
+        private static int? GetNullableInt32(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? null : Convert.ToInt32(reader.GetValue(ordinal));
+        }
+
+        private static decimal GetDecimal(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? 0m : Convert.ToDecimal(reader.GetValue(ordinal));
+        }
+
+        private static DateTime GetDateTime(DbDataReader reader, string columnName, DateTime defaultValue)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? defaultValue : Convert.ToDateTime(reader.GetValue(ordinal));
+        }
+
+        private static string GetString(DbDataReader reader, string columnName, string defaultValue)
+        {
+            return GetStringOrNull(reader, columnName) ?? defaultValue;
+        }
+
+        private static string? GetStringOrNull(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? null : Convert.ToString(reader.GetValue(ordinal));
         }
 
         public async Task<IActionResult> Create()
