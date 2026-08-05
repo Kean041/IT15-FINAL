@@ -1,5 +1,4 @@
 @model FinSight.Models.ViewModels.LoginViewModel
-@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     Layout = "~/Views/Shared/_IdentityLayout.cshtml";
     ViewData["Title"] = "Login";
@@ -59,9 +58,6 @@
         <a href="#" class="small">Forgot Password?</a>
     </div>
 
-    <!-- Cloudflare Turnstile -->
-    <div class="cf-turnstile mb-3 d-flex justify-content-center" data-sitekey="@Configuration["Cloudflare:TurnstileSiteKey"]"></div>
-
     <!-- Login Button -->
     <button type="submit" class="btn btn-primary w-100 py-2 mb-3">
         Login Securely <i class="bi bi-arrow-right ms-2"></i>
@@ -77,7 +73,3 @@
         <a asp-controller="Auth" asp-action="Register" class="fw-bold ms-1" style="color: var(--primary);">Register</a>
     </div>
 </form>
-
-@section Scripts {
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-}
