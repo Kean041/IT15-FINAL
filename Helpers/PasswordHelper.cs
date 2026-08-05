@@ -48,8 +48,9 @@ namespace FinSight.Helpers
                 return VerifyPbkdf2(password, storedHash);
             }
 
-            // Legacy SHA256 fallback
-            return VerifyLegacySha256(password, storedHash);
+            // Legacy fallbacks for older/manual demo databases.
+            // Successful legacy logins are upgraded to PBKDF2 by AuthController.
+            return VerifyLegacySha256(password, storedHash) || VerifyLegacyPlainText(password, storedHash);
         }
 
         /// <summary>
@@ -93,6 +94,9 @@ namespace FinSight.Helpers
         // ── Legacy SHA256 verification (for migration) ──
         private static bool VerifyLegacySha256(string password, string storedHash)
         {
+            if (!IsSha256HexHash(storedHash))
+                return false;
+
             using var sha256 = SHA256.Create();
             var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
             var sb = new StringBuilder();
@@ -100,6 +104,19 @@ namespace FinSight.Helpers
                 sb.Append(b.ToString("x2"));
 
             return string.Equals(sb.ToString(), storedHash, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool VerifyLegacyPlainText(string password, string storedHash)
+        {
+            if (IsSha256HexHash(storedHash))
+                return false;
+
+            return string.Equals(password, storedHash, StringComparison.Ordinal);
+        }
+
+        private static bool IsSha256HexHash(string storedHash)
+        {
+            return storedHash.Length == 64 && storedHash.All(Uri.IsHexDigit);
         }
     }
 }

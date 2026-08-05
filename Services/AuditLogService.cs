@@ -1,5 +1,6 @@
 using FinSight.Data;
 using FinSight.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace FinSight.Services
 {
@@ -10,10 +11,12 @@ namespace FinSight.Services
     public class AuditLogService
     {
         private readonly FinSightDbContext _context;
+        private readonly ILogger<AuditLogService> _logger;
 
-        public AuditLogService(FinSightDbContext context)
+        public AuditLogService(FinSightDbContext context, ILogger<AuditLogService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         /// <summary>
@@ -69,8 +72,16 @@ namespace FinSight.Services
                 CreatedAt = DateTime.Now
             };
 
-            _context.AuditLogs.Add(log);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.AuditLogs.Add(log);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _context.Entry(log).State = EntityState.Detached;
+                _logger.LogError(ex, "Audit logging failed for action {Action}.", action);
+            }
         }
     }
 }

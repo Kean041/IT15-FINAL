@@ -66,22 +66,29 @@ QuestPDF.Settings.License = LicenseType.Community;
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<FinSightDbContext>();
+    var logger = services.GetRequiredService<ILogger<Program>>();
+
     try
     {
-        var context = services.GetRequiredService<FinSightDbContext>();
-        var logger = services.GetRequiredService<ILogger<Program>>();
-
-        // Repair legacy/manual expense tables before migrations or page queries use them.
-        await DbInitializer.EnsureExpenseSchemaAsync(context, logger);
-
         // Automatically apply pending migrations on startup
         await context.Database.MigrateAsync();
-        
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed applying EF Core migrations during app startup.");
+    }
+
+    try
+    {
+        // Repair legacy/manual tables after migrations in case the database was only partially migrated.
+        await DbInitializer.EnsureAuthSchemaAsync(context, logger);
+        await DbInitializer.EnsureExpenseSchemaAsync(context, logger);
+
         await DbInitializer.InitializeAsync(context, logger, builder.Configuration);
     }
     catch (Exception ex)
     {
-        var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "Failed executing DbInitializer during app startup.");
     }
 }

@@ -8,6 +8,188 @@ namespace FinSight.Data
 {
     public static class DbInitializer
     {
+        public static async Task EnsureAuthSchemaAsync(FinSightDbContext context, ILogger logger)
+        {
+            // MonsterASP demo databases are sometimes created manually or partially migrated.
+            // These idempotent repairs keep login/register from failing when auth support tables lag behind the model.
+            logger.LogInformation("Ensuring authentication schema has required columns and tables...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('Tenants', 'U') IS NOT NULL
+                BEGIN
+                    IF COL_LENGTH('Tenants', 'SubscriptionPlan') IS NULL
+                        ALTER TABLE Tenants ADD SubscriptionPlan NVARCHAR(50) NULL;
+
+                    IF COL_LENGTH('Tenants', 'StripeCustomerId') IS NULL
+                        ALTER TABLE Tenants ADD StripeCustomerId NVARCHAR(100) NULL;
+
+                    IF COL_LENGTH('Tenants', 'StripeSubscriptionId') IS NULL
+                        ALTER TABLE Tenants ADD StripeSubscriptionId NVARCHAR(100) NULL;
+
+                    IF COL_LENGTH('Tenants', 'SubscriptionStatus') IS NULL
+                        ALTER TABLE Tenants ADD SubscriptionStatus NVARCHAR(50) NULL CONSTRAINT DF_Tenants_SubscriptionStatus_Repair DEFAULT ('Pending');
+                END
+
+                IF OBJECT_ID('Users', 'U') IS NOT NULL
+                BEGIN
+                    IF COL_LENGTH('Users', 'DepartmentID') IS NULL
+                        ALTER TABLE Users ADD DepartmentID INT NULL;
+
+                    IF COL_LENGTH('Users', 'IsArchived') IS NULL
+                        ALTER TABLE Users ADD IsArchived BIT NOT NULL CONSTRAINT DF_Users_IsArchived_Repair DEFAULT (0);
+
+                    IF COL_LENGTH('Users', 'FailedLoginAttempts') IS NULL
+                        ALTER TABLE Users ADD FailedLoginAttempts INT NOT NULL CONSTRAINT DF_Users_FailedLoginAttempts_Repair DEFAULT (0);
+
+                    IF COL_LENGTH('Users', 'LockoutEnd') IS NULL
+                        ALTER TABLE Users ADD LockoutEnd DATETIME2 NULL;
+
+                    IF COL_LENGTH('Users', 'IsTwoFactorEnabled') IS NULL
+                        ALTER TABLE Users ADD IsTwoFactorEnabled BIT NOT NULL CONSTRAINT DF_Users_IsTwoFactorEnabled_Repair DEFAULT (0);
+
+                    IF COL_LENGTH('Users', 'TwoFactorSecretKey') IS NULL
+                        ALTER TABLE Users ADD TwoFactorSecretKey NVARCHAR(500) NULL;
+                END
+
+                IF OBJECT_ID('AuditLogs', 'U') IS NULL
+                BEGIN
+                    CREATE TABLE AuditLogs
+                    (
+                        AuditLogID INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_AuditLogs PRIMARY KEY,
+                        TenantID INT NULL,
+                        UserID INT NULL,
+                        LogType NVARCHAR(50) NOT NULL CONSTRAINT DF_AuditLogs_LogType_Repair DEFAULT ('System'),
+                        Severity NVARCHAR(50) NOT NULL CONSTRAINT DF_AuditLogs_Severity_Repair DEFAULT ('Info'),
+                        [Action] NVARCHAR(200) NOT NULL CONSTRAINT DF_AuditLogs_Action_Repair DEFAULT ('Unknown'),
+                        Details NVARCHAR(2000) NULL,
+                        IPAddress NVARCHAR(50) NULL,
+                        CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_AuditLogs_CreatedAt_Repair DEFAULT (GETDATE())
+                    );
+                END
+
+                IF OBJECT_ID('AuditLogs', 'U') IS NOT NULL
+                BEGIN
+                    IF COL_LENGTH('AuditLogs', 'TenantID') IS NULL
+                        ALTER TABLE AuditLogs ADD TenantID INT NULL;
+
+                    IF COL_LENGTH('AuditLogs', 'UserID') IS NULL
+                        ALTER TABLE AuditLogs ADD UserID INT NULL;
+
+                    IF COL_LENGTH('AuditLogs', 'LogType') IS NULL
+                        ALTER TABLE AuditLogs ADD LogType NVARCHAR(50) NOT NULL CONSTRAINT DF_AuditLogs_LogType_Repair DEFAULT ('System');
+
+                    IF COL_LENGTH('AuditLogs', 'Severity') IS NULL
+                        ALTER TABLE AuditLogs ADD Severity NVARCHAR(50) NOT NULL CONSTRAINT DF_AuditLogs_Severity_Repair DEFAULT ('Info');
+
+                    IF COL_LENGTH('AuditLogs', 'Action') IS NULL
+                        ALTER TABLE AuditLogs ADD [Action] NVARCHAR(200) NOT NULL CONSTRAINT DF_AuditLogs_Action_Repair DEFAULT ('Unknown');
+
+                    IF COL_LENGTH('AuditLogs', 'Details') IS NULL
+                        ALTER TABLE AuditLogs ADD Details NVARCHAR(2000) NULL;
+
+                    IF COL_LENGTH('AuditLogs', 'IPAddress') IS NULL
+                        ALTER TABLE AuditLogs ADD IPAddress NVARCHAR(50) NULL;
+
+                    IF COL_LENGTH('AuditLogs', 'CreatedAt') IS NULL
+                        ALTER TABLE AuditLogs ADD CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_AuditLogs_CreatedAt_Repair DEFAULT (GETDATE());
+                END
+
+                IF OBJECT_ID('Notifications', 'U') IS NULL
+                BEGIN
+                    CREATE TABLE Notifications
+                    (
+                        NotificationID INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Notifications PRIMARY KEY,
+                        TenantID INT NULL,
+                        UserID INT NULL,
+                        Title NVARCHAR(150) NOT NULL CONSTRAINT DF_Notifications_Title_Repair DEFAULT ('Notification'),
+                        [Message] NVARCHAR(500) NOT NULL CONSTRAINT DF_Notifications_Message_Repair DEFAULT (''),
+                        NotificationType NVARCHAR(50) NOT NULL CONSTRAINT DF_Notifications_Type_Repair DEFAULT ('System'),
+                        IsRead BIT NOT NULL CONSTRAINT DF_Notifications_IsRead_Repair DEFAULT (0),
+                        RedirectUrl NVARCHAR(255) NULL,
+                        CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_Notifications_CreatedAt_Repair DEFAULT (GETDATE())
+                    );
+                END
+
+                IF OBJECT_ID('Notifications', 'U') IS NOT NULL
+                BEGIN
+                    IF COL_LENGTH('Notifications', 'TenantID') IS NULL
+                        ALTER TABLE Notifications ADD TenantID INT NULL;
+
+                    IF COL_LENGTH('Notifications', 'UserID') IS NULL
+                        ALTER TABLE Notifications ADD UserID INT NULL;
+
+                    IF COL_LENGTH('Notifications', 'Title') IS NULL
+                        ALTER TABLE Notifications ADD Title NVARCHAR(150) NOT NULL CONSTRAINT DF_Notifications_Title_Repair DEFAULT ('Notification');
+
+                    IF COL_LENGTH('Notifications', 'Message') IS NULL
+                        ALTER TABLE Notifications ADD [Message] NVARCHAR(500) NOT NULL CONSTRAINT DF_Notifications_Message_Repair DEFAULT ('');
+
+                    IF COL_LENGTH('Notifications', 'NotificationType') IS NULL
+                        ALTER TABLE Notifications ADD NotificationType NVARCHAR(50) NOT NULL CONSTRAINT DF_Notifications_Type_Repair DEFAULT ('System');
+
+                    IF COL_LENGTH('Notifications', 'IsRead') IS NULL
+                        ALTER TABLE Notifications ADD IsRead BIT NOT NULL CONSTRAINT DF_Notifications_IsRead_Repair DEFAULT (0);
+
+                    IF COL_LENGTH('Notifications', 'RedirectUrl') IS NULL
+                        ALTER TABLE Notifications ADD RedirectUrl NVARCHAR(255) NULL;
+
+                    IF COL_LENGTH('Notifications', 'CreatedAt') IS NULL
+                        ALTER TABLE Notifications ADD CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_Notifications_CreatedAt_Repair DEFAULT (GETDATE());
+                END
+
+                IF OBJECT_ID('UserOTPs', 'U') IS NULL AND OBJECT_ID('Users', 'U') IS NOT NULL
+                BEGIN
+                    CREATE TABLE UserOTPs
+                    (
+                        OTPID INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_UserOTPs PRIMARY KEY,
+                        UserID INT NOT NULL,
+                        TenantID INT NULL,
+                        OTPHash NVARCHAR(255) NOT NULL,
+                        GeneratedAt DATETIME2 NOT NULL,
+                        ExpiresAt DATETIME2 NOT NULL,
+                        UsedAt DATETIME2 NULL,
+                        IsUsed BIT NOT NULL CONSTRAINT DF_UserOTPs_IsUsed_Repair DEFAULT (0),
+                        AttemptCount INT NOT NULL CONSTRAINT DF_UserOTPs_AttemptCount_Repair DEFAULT (0),
+                        IsExpired BIT NOT NULL CONSTRAINT DF_UserOTPs_IsExpired_Repair DEFAULT (0),
+                        CreatedByIP NVARCHAR(50) NULL
+                    );
+                END
+
+                IF OBJECT_ID('UserOTPs', 'U') IS NOT NULL
+                BEGIN
+                    IF COL_LENGTH('UserOTPs', 'UserID') IS NULL
+                        ALTER TABLE UserOTPs ADD UserID INT NOT NULL CONSTRAINT DF_UserOTPs_UserID_Repair DEFAULT (0);
+
+                    IF COL_LENGTH('UserOTPs', 'TenantID') IS NULL
+                        ALTER TABLE UserOTPs ADD TenantID INT NULL;
+
+                    IF COL_LENGTH('UserOTPs', 'OTPHash') IS NULL
+                        ALTER TABLE UserOTPs ADD OTPHash NVARCHAR(255) NOT NULL CONSTRAINT DF_UserOTPs_OTPHash_Repair DEFAULT ('');
+
+                    IF COL_LENGTH('UserOTPs', 'GeneratedAt') IS NULL
+                        ALTER TABLE UserOTPs ADD GeneratedAt DATETIME2 NOT NULL CONSTRAINT DF_UserOTPs_GeneratedAt_Repair DEFAULT (GETDATE());
+
+                    IF COL_LENGTH('UserOTPs', 'ExpiresAt') IS NULL
+                        ALTER TABLE UserOTPs ADD ExpiresAt DATETIME2 NOT NULL CONSTRAINT DF_UserOTPs_ExpiresAt_Repair DEFAULT (GETDATE());
+
+                    IF COL_LENGTH('UserOTPs', 'UsedAt') IS NULL
+                        ALTER TABLE UserOTPs ADD UsedAt DATETIME2 NULL;
+
+                    IF COL_LENGTH('UserOTPs', 'IsUsed') IS NULL
+                        ALTER TABLE UserOTPs ADD IsUsed BIT NOT NULL CONSTRAINT DF_UserOTPs_IsUsed_Repair DEFAULT (0);
+
+                    IF COL_LENGTH('UserOTPs', 'AttemptCount') IS NULL
+                        ALTER TABLE UserOTPs ADD AttemptCount INT NOT NULL CONSTRAINT DF_UserOTPs_AttemptCount_Repair DEFAULT (0);
+
+                    IF COL_LENGTH('UserOTPs', 'IsExpired') IS NULL
+                        ALTER TABLE UserOTPs ADD IsExpired BIT NOT NULL CONSTRAINT DF_UserOTPs_IsExpired_Repair DEFAULT (0);
+
+                    IF COL_LENGTH('UserOTPs', 'CreatedByIP') IS NULL
+                        ALTER TABLE UserOTPs ADD CreatedByIP NVARCHAR(50) NULL;
+                END");
+
+            logger.LogInformation("Authentication schema repair complete.");
+        }
+
         public static async Task EnsureExpenseSchemaAsync(FinSightDbContext context, ILogger logger)
         {
             // Repair older/manual Expenses tables that existed before the expense module
