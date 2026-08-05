@@ -34,6 +34,12 @@ namespace FinSight.Data
                     IF COL_LENGTH('Users', 'DepartmentID') IS NULL
                         ALTER TABLE Users ADD DepartmentID INT NULL;
 
+                    IF COL_LENGTH('Users', 'CreatedAt') IS NULL
+                        ALTER TABLE Users ADD CreatedAt DATETIME2 NULL;
+
+                    IF COL_LENGTH('Users', 'UpdatedAt') IS NULL
+                        ALTER TABLE Users ADD UpdatedAt DATETIME2 NULL;
+
                     IF COL_LENGTH('Users', 'IsArchived') IS NULL
                         ALTER TABLE Users ADD IsArchived BIT NOT NULL CONSTRAINT DF_Users_IsArchived_Repair DEFAULT (0);
 
@@ -51,6 +57,9 @@ namespace FinSight.Data
 
                     IF COL_LENGTH('Users', 'FullName') IS NOT NULL
                         UPDATE Users SET FullName = COALESCE(NULLIF(FullName, ''), Email, 'Admin User') WHERE FullName IS NULL OR FullName = '';
+
+                    IF COL_LENGTH('Users', 'CreatedAt') IS NOT NULL
+                        UPDATE Users SET CreatedAt = GETDATE() WHERE CreatedAt IS NULL;
 
                     IF COL_LENGTH('Users', 'IsArchived') IS NOT NULL
                         UPDATE Users SET IsArchived = 0 WHERE IsArchived IS NULL;
@@ -474,6 +483,9 @@ namespace FinSight.Data
                         IF COL_LENGTH('Expenses', 'Date') IS NOT NULL
                             EXEC(N'UPDATE Expenses SET ExpenseDate = [Date] WHERE [Date] IS NOT NULL;');
                     END
+
+                    IF COL_LENGTH('Expenses', 'ExpenseDate') IS NOT NULL AND COL_LENGTH('Expenses', 'Date') IS NOT NULL
+                        EXEC(N'UPDATE Expenses SET ExpenseDate = [Date] WHERE [Date] IS NOT NULL AND (ExpenseDate IS NULL OR ExpenseDate < ''19000101'');');
 
                     IF COL_LENGTH('Expenses', 'Status') IS NULL
                         ALTER TABLE Expenses ADD [Status] NVARCHAR(50) NOT NULL CONSTRAINT DF_Expenses_Status_Repair DEFAULT ('Recorded');

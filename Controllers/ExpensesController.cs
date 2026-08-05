@@ -42,9 +42,6 @@ namespace FinSight.Controllers
             {
             var query = _db.Expenses
                 .AsNoTracking()
-                .Include(e => e.Budget)
-                .Include(e => e.Department)
-                .Include(e => e.BudgetRequest)
                 .AsQueryable();
 
             if (tenantFilter != null)
@@ -108,18 +105,56 @@ namespace FinSight.Controllers
 
             // Keep pagination in memory for compatibility with older SQL Server versions
             // that reject EF Core's OFFSET/FETCH SQL.
-            var filteredItems = await query
+            var filteredRows = await query
                 .OrderByDescending(e => e.ExpenseDate)
                 .ThenByDescending(e => e.ExpenseID)
+                .Select(e => new
+                {
+                    e.ExpenseID,
+                    e.BudgetRequestID,
+                    e.BudgetID,
+                    e.DepartmentID,
+                    e.TenantID,
+                    e.ExpenseTitle,
+                    e.Category,
+                    e.Description,
+                    e.Amount,
+                    e.ExpenseDate,
+                    e.Status,
+                    e.CreatedAt,
+                    DepartmentName = e.Department != null ? e.Department.DepartmentName : null
+                })
                 .ToListAsync();
 
             var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
             if (totalPages == 0) totalPages = 1;
             if (page > totalPages) page = totalPages;
 
-            var items = filteredItems
+            var items = filteredRows
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
+                .Select(e => new Expense
+                {
+                    ExpenseID = e.ExpenseID,
+                    BudgetRequestID = e.BudgetRequestID,
+                    BudgetID = e.BudgetID,
+                    DepartmentID = e.DepartmentID,
+                    TenantID = e.TenantID,
+                    ExpenseTitle = e.ExpenseTitle ?? string.Empty,
+                    Category = e.Category ?? string.Empty,
+                    Description = e.Description ?? string.Empty,
+                    Amount = e.Amount,
+                    ExpenseDate = e.ExpenseDate,
+                    Status = e.Status ?? "Recorded",
+                    CreatedAt = e.CreatedAt,
+                    Department = string.IsNullOrWhiteSpace(e.DepartmentName)
+                        ? null
+                        : new Department
+                        {
+                            DepartmentID = e.DepartmentID,
+                            DepartmentName = e.DepartmentName
+                        }
+                })
                 .ToList();
 
             ViewBag.TotalExpenses = totalExpenses;
@@ -145,6 +180,11 @@ namespace FinSight.Controllers
                     .AsNoTracking()
                     .Where(d => tenantFilter == null || d.TenantID == tenantFilter)
                     .OrderBy(d => d.DepartmentName)
+                    .Select(d => new
+                    {
+                        d.DepartmentID,
+                        d.DepartmentName
+                    })
                     .ToListAsync();
                 ViewBag.Departments = new SelectList(depts, "DepartmentID", "DepartmentName", departmentId);
             }

@@ -341,6 +341,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4" style="background:var(--bg);">
+                <input type="hidden" id="reviewRequestId" />
                 <div class="bg-white rounded-3 p-3 shadow-sm mb-3">
                     <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Title</div><div class="col-7 fw-bold text-dark" id="rvTitle"></div></div>
                     <div class="row mb-2"><div class="col-5 text-muted small fw-semibold">Description</div><div class="col-7 text-dark small" id="rvDesc"></div></div>
@@ -391,7 +392,6 @@
                     </button>
                 </div>
             </form>
-            </div>
         </div>
     </div>
 </div>
@@ -437,7 +437,7 @@
 
     function openReviewModal(id, title, desc, dept, amount, budget, dateNeeded, submitter, date) {
         // Store the ID globally for the modals
-        document.getElementById('approveModalId').value = id;
+        document.getElementById('reviewRequestId').value = id;
         document.getElementById('rejectModalId').value = id;
         
         document.getElementById('rvTitle').innerText = title;
@@ -455,7 +455,7 @@
     function openApproveModal() {
         reviewModalInstance.hide();
         
-        const id = document.getElementById('rejectModalId').value;
+        const id = document.getElementById('reviewRequestId').value;
         const form = new FormData();
         form.append('id', id);
         
