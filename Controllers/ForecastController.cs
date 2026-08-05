@@ -6,6 +6,7 @@ using FinSight.Models.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,11 +19,16 @@ namespace FinSight.Controllers
     {
         private readonly FinSightDbContext _context;
         private readonly AlphaVantageService _alphaVantage;
+        private readonly ILogger<ForecastController> _logger;
 
-        public ForecastController(FinSightDbContext context, AlphaVantageService alphaVantage)
+        public ForecastController(
+            FinSightDbContext context,
+            AlphaVantageService alphaVantage,
+            ILogger<ForecastController> logger)
         {
             _context = context;
             _alphaVantage = alphaVantage;
+            _logger = logger;
         }
 
         // GET: Forecast
@@ -36,8 +42,11 @@ namespace FinSight.Controllers
             int? tenantFilter = GetTenantFilter();
             int pageSize = 10;
 
+            try
+            {
             // 1. Fetch Budgets
             var budgetQuery = _context.Budgets
+                .AsNoTracking()
                 .Include(b => b.Department)
                 .AsQueryable();
 
@@ -53,7 +62,7 @@ namespace FinSight.Controllers
             var budgets = await budgetQuery.ToListAsync();
 
             // 2. Fetch Expenses grouped by BudgetID
-            var expenseQuery = _context.Expenses.AsQueryable();
+            var expenseQuery = _context.Expenses.AsNoTracking().AsQueryable();
 
             if (tenantFilter != null)
                 expenseQuery = expenseQuery.Where(e => e.TenantID == tenantFilter.Value);
@@ -200,7 +209,7 @@ namespace FinSight.Controllers
             var pagedData = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
             // 9. Filter dropdowns
-            var deptDropdownQuery = _context.Departments.AsQueryable();
+            var deptDropdownQuery = _context.Departments.AsNoTracking().AsQueryable();
             if (tenantFilter != null)
                 deptDropdownQuery = deptDropdownQuery.Where(d => d.TenantID == tenantFilter.Value);
 
@@ -213,7 +222,7 @@ namespace FinSight.Controllers
                 }).ToListAsync();
 
             // Distinct years from budgets for year filter
-            var yearQuery = _context.Budgets.AsQueryable();
+            var yearQuery = _context.Budgets.AsNoTracking().AsQueryable();
             if (tenantFilter != null)
                 yearQuery = yearQuery.Where(b => b.TenantID == tenantFilter.Value);
 
@@ -237,6 +246,39 @@ namespace FinSight.Controllers
             ViewBag.RoleID = CurrentRoleID;
 
             return View(pagedData);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Forecast page failed for user {UserID}, role {RoleID}, tenant {TenantID}.",
+                    CurrentUserID,
+                    CurrentRoleID,
+                    tenantFilter);
+
+                PopulateFallbackViewBags(searchString, yearFilter, departmentFilter, page);
+                return View(new List<DynamicForecastViewModel>());
+            }
+        }
+
+        private void PopulateFallbackViewBags(string searchString, int? yearFilter, int? departmentFilter, int page)
+        {
+            ViewBag.EconomicData = null;
+            ViewBag.AppliedInflationRate = 0m;
+            ViewBag.TotalForecasts = 0;
+            ViewBag.TotalProjectedExpenses = 0m;
+            ViewBag.DeptsCovered = 0;
+            ViewBag.TotalProjectedVariance = 0m;
+            ViewBag.BarChartLabels = "[]";
+            ViewBag.BarChartBudget = "[]";
+            ViewBag.BarChartForecast = "[]";
+            ViewBag.DepartmentList = new List<SelectListItem>();
+            ViewBag.YearList = new List<SelectListItem>();
+            ViewBag.CurrentSearch = searchString;
+            ViewBag.CurrentYear = yearFilter;
+            ViewBag.CurrentDepartment = departmentFilter;
+            ViewBag.CurrentPage = page < 1 ? 1 : page;
+            ViewBag.TotalPages = 1;
+            ViewBag.RoleID = CurrentRoleID;
         }
     }
 }
