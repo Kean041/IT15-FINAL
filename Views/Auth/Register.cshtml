@@ -1,5 +1,4 @@
 @model FinSight.Models.ViewModels.RegisterViewModel
-@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     Layout = "~/Views/Shared/_IdentityLayout.cshtml";
     ViewData["Title"] = "Create Account";
@@ -91,9 +90,6 @@
         <span asp-validation-for="ConfirmPassword" class="field-validation-error"></span>
     </div>
 
-    <!-- Cloudflare Turnstile -->
-    <div class="cf-turnstile mb-3 d-flex justify-content-center" data-sitekey="@Configuration["Cloudflare:TurnstileSiteKey"]"></div>
-
     <!-- Register Button -->
     <button type="submit" class="btn btn-primary w-100 py-2 mb-4">
         Create Account <i class="bi bi-arrow-right ms-2"></i>
@@ -105,7 +101,3 @@
         <a asp-controller="Auth" asp-action="Login" class="fw-bold ms-1" style="color: var(--primary);">Login</a>
     </div>
 </form>
-
-@section Scripts {
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-}

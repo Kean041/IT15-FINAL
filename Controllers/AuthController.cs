@@ -6,7 +6,6 @@ using FinSight.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
-using System.Text.Json;
 using OtpNet;
 using QRCoder;
 
@@ -53,14 +52,6 @@ namespace FinSight.Controllers
         {
             if (!ModelState.IsValid)
                 return View(model);
-
-            // Verify Cloudflare Turnstile
-            var turnstileToken = Request.Form["cf-turnstile-response"].ToString();
-            if (!await VerifyTurnstileTokenAsync(turnstileToken))
-            {
-                ModelState.AddModelError("", "Security check failed. Please verify you are a human.");
-                return View(model);
-            }
 
             // Check if email already exists
             var existingUser = await _context.Users
@@ -148,14 +139,6 @@ namespace FinSight.Controllers
         {
             if (!ModelState.IsValid)
                 return View(model);
-
-            // Verify Cloudflare Turnstile
-            var turnstileToken = Request.Form["cf-turnstile-response"].ToString();
-            if (!await VerifyTurnstileTokenAsync(turnstileToken))
-            {
-                ViewBag.Error = "Security check failed. Please verify you are a human.";
-                return View(model);
-            }
 
             // Find user by email only (don't expose whether email exists)
             var user = await _context.Users
@@ -493,31 +476,5 @@ namespace FinSight.Controllers
         }
 
         private string? GetIP() => HttpContext.Connection.RemoteIpAddress?.ToString();
-
-        // ── Cloudflare Turnstile Helper ─────────────
-        private async Task<bool> VerifyTurnstileTokenAsync(string token)
-        {
-            if (string.IsNullOrEmpty(token)) return false;
-
-            var secretKey = _configuration["Cloudflare:TurnstileSecretKey"];
-            if (string.IsNullOrEmpty(secretKey)) return true; // Skip if no key (dev mode bypass)
-
-            using var client = new HttpClient();
-            var content = new FormUrlEncodedContent(new[]
-            {
-                new KeyValuePair<string, string>("secret", secretKey),
-                new KeyValuePair<string, string>("response", token),
-                new KeyValuePair<string, string>("remoteip", GetIP() ?? "")
-            });
-
-            var response = await client.PostAsync("https://challenges.cloudflare.com/turnstile/v0/siteverify", content);
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonString = await response.Content.ReadAsStringAsync();
-                using var doc = JsonDocument.Parse(jsonString);
-                return doc.RootElement.GetProperty("success").GetBoolean();
-            }
-            return false;
-        }
     }
 }
