@@ -1,33 +1,40 @@
-name: Deploy to SmarterASP.NET
+name: Deploy FinSight to MonsterASP.NET
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
-
+    runs-on: windows-latest
+ 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ vars.DOTNET_VERSION }}
 
-    - name: Publish app
-      run: |
-        dotnet publish FinSight.csproj -c Release -o ./publish -r win-x86 --self-contained true
-        mkdir -p ./publish/logs
+      - name: Restore dependencies
+        run: dotnet restore "${{ vars.PROJECT_PATH }}"
 
-    - name: Deploy via FTP
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-      with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: ./publish/
-        server-dir: /
-        # If your SmarterASP.NET site is in a subfolder like /site/, change server-dir to /site/
+      - name: Build application
+        run: dotnet build "${{ vars.PROJECT_PATH }}" --configuration Release --no-restore
+
+      - name: Publish application
+        run: dotnet publish "${{ vars.PROJECT_PATH }}" --configuration Release --output "./publish" --runtime "${{ vars.PUBLISH_RUNTIME }}" --self-contained false
+
+      - name: Deploy to MonsterASP.NET
+        uses: rasmusbuchholdt/simply-web-deploy@2.1.0
+        with:
+          website-name: ${{ secrets.WEBSITE_NAME }}
+          server-computer-name: ${{ secrets.SERVER_COMPUTER_NAME }}
+          server-username: ${{ secrets.SERVER_USERNAME }}
+          server-password: ${{ secrets.SERVER_PASSWORD }}
