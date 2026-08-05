@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,10 +17,12 @@ namespace FinSight.Controllers
     public class ScenarioController : BaseController
     {
         private readonly FinSightDbContext _context;
+        private readonly ILogger<ScenarioController> _logger;
 
-        public ScenarioController(FinSightDbContext context)
+        public ScenarioController(FinSightDbContext context, ILogger<ScenarioController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // ─────────────────────────────────────────────
@@ -36,7 +39,10 @@ namespace FinSight.Controllers
             int? tenantFilter = GetTenantFilter();
             int pageSize = 10;
 
+            try
+            {
             var query = _context.Scenarios
+                .AsNoTracking()
                 .Include(s => s.Creator)
                 .Include(s => s.ScenarioDetails)
                     .ThenInclude(sd => sd.Budget)
@@ -85,7 +91,7 @@ namespace FinSight.Controllers
             ViewBag.DeptsCovered    = deptsCovered;
 
             // --- Chart: Budget.Amount vs AdjustedAmount per Department ---
-            var budgetQuery = _context.Budgets.Include(b => b.Department).AsQueryable();
+            var budgetQuery = _context.Budgets.AsNoTracking().Include(b => b.Department).AsQueryable();
             if (tenantFilter != null)
                 budgetQuery = budgetQuery.Where(b => b.TenantID == tenantFilter.Value);
 
@@ -137,6 +143,37 @@ namespace FinSight.Controllers
             ViewBag.RoleID    = CurrentRoleID;
 
             return View(pagedData);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Scenario planning page failed for user {UserID}, role {RoleID}, tenant {TenantID}.",
+                    CurrentUserID,
+                    CurrentRoleID,
+                    tenantFilter);
+
+                PopulatePlanningFallbackViewBags(searchString, periodFilter, page);
+                return View(new List<Scenario>());
+            }
+        }
+
+        private void PopulatePlanningFallbackViewBags(string searchString, string periodFilter, int page)
+        {
+            ViewBag.TotalScenarios = 0;
+            ViewBag.TotalAdjusted = 0m;
+            ViewBag.DeptsCovered = 0;
+            ViewBag.ChartLabels = "[]";
+            ViewBag.ChartOriginals = "[]";
+            ViewBag.ChartAdjusteds = "[]";
+            ViewBag.CurrentSearch = searchString;
+            ViewBag.CurrentPeriod = periodFilter;
+            ViewBag.CurrentPage = page < 1 ? 1 : page;
+            ViewBag.TotalPages = 1;
+            ViewBag.Budgets = new List<SelectListItem>();
+            ViewBag.CanWrite = CanWriteFinancials;
+            ViewBag.CanDelete = CanDeleteRecords;
+            ViewBag.RoleID = CurrentRoleID;
+            TempData["Error"] = "Scenario data is temporarily unavailable while the hosted database schema is being repaired.";
         }
 
         // ─────────────────────────────────────────────

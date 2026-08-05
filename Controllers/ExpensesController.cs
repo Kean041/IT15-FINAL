@@ -5,6 +5,7 @@ using System.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using FinSight.Data;
 using FinSight.Models;
 using FinSight.Helpers;
@@ -14,10 +15,12 @@ namespace FinSight.Controllers
     public class ExpensesController : BaseController
     {
         private readonly FinSightDbContext _db;
+        private readonly ILogger<ExpensesController> _logger;
 
-        public ExpensesController(FinSightDbContext db)
+        public ExpensesController(FinSightDbContext db, ILogger<ExpensesController> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         // ─────────────────────────────────────────────
@@ -35,7 +38,10 @@ namespace FinSight.Controllers
             var roleId = CurrentRoleID ?? Roles.DepartmentHead;
             var tenantFilter = GetTenantFilter();
 
+            try
+            {
             var query = _db.Expenses
+                .AsNoTracking()
                 .Include(e => e.Budget)
                 .Include(e => e.Department)
                 .Include(e => e.BudgetRequest)
@@ -85,10 +91,12 @@ namespace FinSight.Controllers
             if (budgetIds.Any())
             {
                 totalAllocated = await _db.Budgets
+                    .AsNoTracking()
                     .Where(b => budgetIds.Contains(b.BudgetID))
                     .SumAsync(b => (decimal?)b.Amount) ?? 0m;
 
                 totalSpent = await _db.Expenses
+                    .AsNoTracking()
                     .Where(e => budgetIds.Contains(e.BudgetID))
                     .SumAsync(e => (decimal?)e.Amount) ?? 0m;
             }
@@ -134,6 +142,7 @@ namespace FinSight.Controllers
             if (roleId != Roles.DepartmentHead)
             {
                 var depts = await _db.Departments
+                    .AsNoTracking()
                     .Where(d => tenantFilter == null || d.TenantID == tenantFilter)
                     .OrderBy(d => d.DepartmentName)
                     .ToListAsync();
@@ -141,11 +150,56 @@ namespace FinSight.Controllers
             }
 
             return View(items);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Expenses page failed for user {UserID}, role {RoleID}, tenant {TenantID}.",
+                    CurrentUserID,
+                    roleId,
+                    tenantFilter);
+
+                PopulateIndexFallbackViewBags(
+                    roleId,
+                    departmentId,
+                    status,
+                    startDate,
+                    endDate,
+                    search);
+
+                return View(new List<Expense>());
+            }
         }
 
         // ─────────────────────────────────────────────
         // GET: Expenses/Create
         // ─────────────────────────────────────────────
+        private void PopulateIndexFallbackViewBags(
+            int roleId,
+            int? departmentId,
+            string? status,
+            DateTime? startDate,
+            DateTime? endDate,
+            string? search)
+        {
+            ViewBag.TotalExpenses = 0m;
+            ViewBag.MonthlyExpenses = 0m;
+            ViewBag.RemainingBudget = 0m;
+            ViewBag.TotalAllocated = 0m;
+            ViewBag.CurrentPage = 1;
+            ViewBag.TotalPages = 1;
+            ViewBag.TotalCount = 0;
+            ViewBag.RoleID = roleId;
+            ViewBag.CanManage = CanManage;
+            ViewBag.CurrentDepartment = departmentId;
+            ViewBag.CurrentStatus = status;
+            ViewBag.CurrentStartDate = startDate?.ToString("yyyy-MM-dd");
+            ViewBag.CurrentEndDate = endDate?.ToString("yyyy-MM-dd");
+            ViewBag.CurrentSearch = search;
+            ViewBag.Departments = new SelectList(new List<Department>(), "DepartmentID", "DepartmentName", departmentId);
+            TempData["Error"] = "Expense data is temporarily unavailable while the hosted database schema is being repaired.";
+        }
+
         public async Task<IActionResult> Create()
         {
             if (!IsAuthenticated) return RedirectToLogin();
