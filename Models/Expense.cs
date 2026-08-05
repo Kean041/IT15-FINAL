@@ -38,7 +38,6 @@ namespace FinSight.Models
         public decimal Amount { get; set; }
 
         [Required]
-        [Column("Date")]
         public DateTime ExpenseDate { get; set; } = DateTime.Now;
 
         [Required]
