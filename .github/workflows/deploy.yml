@@ -11,33 +11,58 @@ permissions:
 
 env:
   PUBLISH_RUNTIME: ${{ vars.PUBLISH_RUNTIME || 'win-x64' }}
+  PROJECT_PATH: ${{ vars.PROJECT_PATH || 'FinSight.csproj' }}
+  DOTNET_VERSION: ${{ vars.DOTNET_VERSION || '8.0.x' }}
 
 jobs:
   build-and-deploy:
     runs-on: windows-latest
+    env:
+      DEPLOY_WEBSITE_NAME: ${{ secrets.WEBSITE_NAME }}
+      DEPLOY_SERVER_COMPUTER_NAME: ${{ secrets.SERVER_COMPUTER_NAME || format('https://{0}.siteasp.net:8172', secrets.WEBSITE_NAME) }}
+      DEPLOY_SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+      DEPLOY_SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
 
     steps:
+      - name: Validate deployment settings
+        shell: pwsh
+        run: |
+          $missing = @()
+
+          if ([string]::IsNullOrWhiteSpace($env:DEPLOY_WEBSITE_NAME)) { $missing += "WEBSITE_NAME" }
+          if ([string]::IsNullOrWhiteSpace($env:DEPLOY_SERVER_USERNAME)) { $missing += "SERVER_USERNAME" }
+          if ([string]::IsNullOrWhiteSpace($env:DEPLOY_SERVER_PASSWORD)) { $missing += "SERVER_PASSWORD" }
+          if ([string]::IsNullOrWhiteSpace($env:DEPLOY_SERVER_COMPUTER_NAME)) { $missing += "SERVER_COMPUTER_NAME or WEBSITE_NAME" }
+
+          if ($missing.Count -gt 0) {
+            throw "Missing GitHub Actions secret(s): $($missing -join ', '). Add them in Settings > Secrets and variables > Actions."
+          }
+
+          if ($env:DEPLOY_SERVER_COMPUTER_NAME -notmatch '^https?://[^/]+(:\d+)?$') {
+            throw "SERVER_COMPUTER_NAME must be a Web Deploy base URL, for example https://siteXXXX.siteasp.net:8172."
+          }
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ vars.DOTNET_VERSION }}
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore dependencies
-        run: dotnet restore "${{ vars.PROJECT_PATH }}"
+        run: dotnet restore "${{ env.PROJECT_PATH }}"
 
       - name: Build application
-        run: dotnet build "${{ vars.PROJECT_PATH }}" --configuration Release --no-restore
+        run: dotnet build "${{ env.PROJECT_PATH }}" --configuration Release --no-restore
 
       - name: Publish application
-        run: dotnet publish "${{ vars.PROJECT_PATH }}" --configuration Release --output "./publish" --runtime "${{ env.PUBLISH_RUNTIME }}" --self-contained true
+        run: dotnet publish "${{ env.PROJECT_PATH }}" --configuration Release --output "./publish" --runtime "${{ env.PUBLISH_RUNTIME }}" --self-contained true
 
       - name: Deploy to MonsterASP.NET
         uses: rasmusbuchholdt/simply-web-deploy@2.1.0
         with:
-          website-name: ${{ secrets.WEBSITE_NAME }}
-          server-computer-name: ${{ secrets.SERVER_COMPUTER_NAME }}
-          server-username: ${{ secrets.SERVER_USERNAME }}
-          server-password: ${{ secrets.SERVER_PASSWORD }}
+          website-name: ${{ env.DEPLOY_WEBSITE_NAME }}
+          server-computer-name: ${{ env.DEPLOY_SERVER_COMPUTER_NAME }}
+          server-username: ${{ env.DEPLOY_SERVER_USERNAME }}
+          server-password: ${{ env.DEPLOY_SERVER_PASSWORD }}
