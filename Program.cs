@@ -17,9 +17,18 @@ builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error)
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 var dataProtectionKeysPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtection-Keys");
-Directory.CreateDirectory(dataProtectionKeysPath);
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+try
+{
+    Directory.CreateDirectory(dataProtectionKeysPath);
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
+catch (Exception ex)
+{
+    builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Warning);
+    Console.Error.WriteLine($"Data protection keys will use the default provider because '{dataProtectionKeysPath}' is not writable: {ex.Message}");
+    builder.Services.AddDataProtection();
+}
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<EmailService>();

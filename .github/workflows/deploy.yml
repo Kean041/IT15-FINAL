@@ -88,9 +88,9 @@ jobs:
               return
             }
 
-            $existing = $environmentVariables.SelectSingleNode("add[@name='$name']")
+            $existing = $environmentVariables.SelectSingleNode("environmentVariable[@name='$name']")
             if ($null -eq $existing) {
-              $existing = $webConfig.CreateElement("add")
+              $existing = $webConfig.CreateElement("environmentVariable")
               [void]$existing.SetAttribute("name", $name)
               [void]$environmentVariables.AppendChild($existing)
             }
