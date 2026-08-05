@@ -12,7 +12,7 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: windows-latest
- 
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,7 +29,7 @@ jobs:
         run: dotnet build "${{ vars.PROJECT_PATH }}" --configuration Release --no-restore
 
       - name: Publish application
-        run: dotnet publish "${{ vars.PROJECT_PATH }}" --configuration Release --output "./publish" --runtime "${{ vars.PUBLISH_RUNTIME }}" --self-contained false
+        run: dotnet publish "${{ vars.PROJECT_PATH }}" --configuration Release --output "./publish" --runtime "${{ vars.PUBLISH_RUNTIME }}" --self-contained true
 
       - name: Deploy to MonsterASP.NET
         uses: rasmusbuchholdt/simply-web-deploy@2.1.0
