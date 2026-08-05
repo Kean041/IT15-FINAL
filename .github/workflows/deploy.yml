@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PUBLISH_RUNTIME: ${{ vars.PUBLISH_RUNTIME || 'win-x64' }}
+
 jobs:
   build-and-deploy:
     runs-on: windows-latest
@@ -29,7 +32,7 @@ jobs:
         run: dotnet build "${{ vars.PROJECT_PATH }}" --configuration Release --no-restore
 
       - name: Publish application
-        run: dotnet publish "${{ vars.PROJECT_PATH }}" --configuration Release --output "./publish" --runtime "${{ vars.PUBLISH_RUNTIME }}" --self-contained true
+        run: dotnet publish "${{ vars.PROJECT_PATH }}" --configuration Release --output "./publish" --runtime "${{ env.PUBLISH_RUNTIME }}" --self-contained true
 
       - name: Deploy to MonsterASP.NET
         uses: rasmusbuchholdt/simply-web-deploy@2.1.0
