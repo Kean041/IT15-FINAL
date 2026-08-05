@@ -43,11 +43,7 @@ namespace FinSight.Controllers
             {
             var query = _context.Scenarios
                 .AsNoTracking()
-                .Include(s => s.Creator)
                 .Include(s => s.ScenarioDetails)
-                    .ThenInclude(sd => sd.Budget)
-                .Include(s => s.ScenarioDetails)
-                    .ThenInclude(sd => sd.Department)
                 .AsQueryable();
 
             // Apply tenant filter (Super Admin sees all)
@@ -79,6 +75,7 @@ namespace FinSight.Controllers
 
             var orderedQuery = query.OrderByDescending(s => s.CreatedAt);
             var allResults   = await orderedQuery.ToListAsync();
+            await PopulateScenarioCreatorsAsync(allResults);
 
             // --- Analytics ---
             int    totalCount       = allResults.Count;
@@ -91,17 +88,47 @@ namespace FinSight.Controllers
             ViewBag.DeptsCovered    = deptsCovered;
 
             // --- Chart: Budget.Amount vs AdjustedAmount per Department ---
-            var budgetQuery = _context.Budgets.AsNoTracking().Include(b => b.Department).AsQueryable();
+            var budgetQuery = _context.Budgets.AsNoTracking().AsQueryable();
             if (tenantFilter != null)
                 budgetQuery = budgetQuery.Where(b => b.TenantID == tenantFilter.Value);
 
-            var allBudgets = await budgetQuery.ToListAsync();
+            var allBudgets = await budgetQuery
+                .Select(b => new
+                {
+                    b.DepartmentID,
+                    b.Amount,
+                    DepartmentName = b.Department != null ? b.Department.DepartmentName : null
+                })
+                .ToListAsync();
+
+            var scenarioDepartmentIds = allResults
+                .SelectMany(s => s.ScenarioDetails)
+                .Select(sd => sd.DepartmentID)
+                .Distinct()
+                .ToList();
+
+            var scenarioDepartmentNames = scenarioDepartmentIds.Count == 0
+                ? new Dictionary<int, string>()
+                : await _context.Departments
+                    .AsNoTracking()
+                    .Where(d =>
+                        scenarioDepartmentIds.Contains(d.DepartmentID) &&
+                        (tenantFilter == null || d.TenantID == tenantFilter.Value))
+                    .Select(d => new
+                    {
+                        d.DepartmentID,
+                        d.DepartmentName
+                    })
+                    .ToDictionaryAsync(d => d.DepartmentID, d => d.DepartmentName);
 
             var deptNames = allResults
                 .SelectMany(s => s.ScenarioDetails)
-                .Where(sd => sd.Department != null)
-                .Select(sd => sd.Department!.DepartmentName)
-                .Union(allBudgets.Where(b => b.Department != null).Select(b => b.Department!.DepartmentName))
+                .Select(sd => scenarioDepartmentNames.GetValueOrDefault(sd.DepartmentID))
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Union(allBudgets
+                    .Select(b => b.DepartmentName)
+                    .Where(name => !string.IsNullOrWhiteSpace(name)))
+                .Cast<string>()
                 .Distinct()
                 .OrderBy(d => d)
                 .ToList();
@@ -112,11 +139,11 @@ namespace FinSight.Controllers
             foreach (var dept in deptNames)
             {
                 chartOriginals.Add(
-                    allBudgets.Where(b => b.Department != null && b.Department.DepartmentName == dept)
+                    allBudgets.Where(b => b.DepartmentName == dept)
                               .Sum(b => b.Amount));
                 chartAdjusteds.Add(
                     allResults.SelectMany(s => s.ScenarioDetails)
-                              .Where(sd => sd.Department != null && sd.Department.DepartmentName == dept)
+                              .Where(sd => scenarioDepartmentNames.GetValueOrDefault(sd.DepartmentID) == dept)
                               .Sum(sd => sd.AdjustedAmount));
             }
 
@@ -174,6 +201,40 @@ namespace FinSight.Controllers
             ViewBag.CanDelete = CanDeleteRecords;
             ViewBag.RoleID = CurrentRoleID;
             TempData["Error"] = "Scenario data is temporarily unavailable while the hosted database schema is being repaired.";
+        }
+
+        private async Task PopulateScenarioCreatorsAsync(List<Scenario> scenarios)
+        {
+            var creatorIds = scenarios
+                .Select(s => s.CreatedBy)
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            if (creatorIds.Count == 0)
+                return;
+
+            var creatorNames = await _context.Users
+                .AsNoTracking()
+                .Where(u => creatorIds.Contains(u.UserID))
+                .Select(u => new
+                {
+                    u.UserID,
+                    u.FullName
+                })
+                .ToDictionaryAsync(u => u.UserID, u => u.FullName);
+
+            foreach (var scenario in scenarios)
+            {
+                if (!creatorNames.TryGetValue(scenario.CreatedBy, out var fullName))
+                    continue;
+
+                scenario.Creator = new User
+                {
+                    UserID = scenario.CreatedBy,
+                    FullName = fullName
+                };
+            }
         }
 
         // ─────────────────────────────────────────────
@@ -387,9 +448,7 @@ namespace FinSight.Controllers
             int? tenantFilter = GetTenantFilter();
 
             var query = _context.ScenarioDetails
-                .Include(sd => sd.Budget)
-                .Include(sd => sd.Department)
-                .Include(sd => sd.Scenario)
+                .AsNoTracking()
                 .AsQueryable();
 
             if (tenantFilter != null)
@@ -417,7 +476,7 @@ namespace FinSight.Controllers
         private async Task PopulateDropdownsAsync(int? tenantFilter)
         {
             var query = _context.Budgets
-                .Include(b => b.Department)
+                .AsNoTracking()
                 .AsQueryable();
 
             if (tenantFilter != null)
