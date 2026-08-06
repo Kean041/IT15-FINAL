@@ -92,6 +92,7 @@ namespace FinSight.Controllers
                 Email = model.Email,
                 PasswordHash = PasswordHelper.HashPassword(model.Password),
                 RoleID = 1, // Admin
+                IsTwoFactorEnabled = true,
                 CreatedAt = DateTime.Now
             };
             _context.Users.Add(user);
@@ -234,20 +235,20 @@ namespace FinSight.Controllers
             await _context.SaveChangesAsync();
 
             // ── 2FA Check ──
-            bool is2FaGloballyEnabled = _configuration.GetValue<bool>("TwoFactor:Enabled");
-            // Temporarily disable OTP Check
-            /*
-            if (user.IsTwoFactorEnabled || is2FaGloballyEnabled)
+            if (Helpers.Roles.RequiresTwoFactor(user.RoleID ?? 0))
             {
+                user.IsTwoFactorEnabled = true;
+                _context.Update(user);
+                await _context.SaveChangesAsync();
+
                 HttpContext.Session.SetInt32("Pending2FA_UserID", user.UserID);
                 HttpContext.Session.SetString("Pending2FA_Email", user.Email);
 
                 // Generate and send email OTP
                 await GenerateAndSendOTP(user);
 
-                return RedirectToAction("VerifyEmailOTP");
+                return RedirectToAction(nameof(VerifyEmailOTP));
             }
-            */
 
             // Complete Login Immediately
             return await CompleteLogin(user);
@@ -310,7 +311,7 @@ namespace FinSight.Controllers
                     PasswordHash = PasswordHelper.HashPassword(model.Password),
                     RoleID = Helpers.Roles.Admin,
                     IsArchived = false,
-                    IsTwoFactorEnabled = false,
+                    IsTwoFactorEnabled = true,
                     FailedLoginAttempts = 0,
                     LockoutEnd = null,
                     CreatedAt = DateTime.Now,
@@ -327,7 +328,7 @@ namespace FinSight.Controllers
                 user.Email = configuredEmail;
                 user.RoleID = Helpers.Roles.Admin;
                 user.IsArchived = false;
-                user.IsTwoFactorEnabled = false;
+                user.IsTwoFactorEnabled = true;
                 user.FailedLoginAttempts = 0;
                 user.LockoutEnd = null;
                 user.CreatedAt ??= DateTime.Now;

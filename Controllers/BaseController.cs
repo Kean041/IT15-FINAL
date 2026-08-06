@@ -67,10 +67,10 @@ namespace FinSight.Controllers
             var pending2FAUserId = HttpContext.Session.GetInt32("Pending2FA_UserID");
             if (pending2FAUserId != null && !IsAuthenticated)
             {
-                // Allow access to Auth controller only (VerifyOtp, ResendOtp, Login, Logout)
+                // Allow access to Auth controller only (VerifyEmailOTP, ResendEmailOTP, Login, Logout)
                 if (controllerName != "Auth")
                 {
-                    context.Result = RedirectToAction("VerifyOtp", "Auth");
+                    context.Result = RedirectToAction("VerifyEmailOTP", "Auth");
                     return;
                 }
             }
