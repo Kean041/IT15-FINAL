@@ -361,6 +361,7 @@ namespace FinSight.Controllers
                 PasswordHash = PasswordHelper.HashPassword(model.AdminPassword),
                 RoleID = Roles.Admin,
                 TenantID = tenant.TenantID,
+                IsTwoFactorEnabled = true,
                 CreatedAt = DateTime.Now
             };
 

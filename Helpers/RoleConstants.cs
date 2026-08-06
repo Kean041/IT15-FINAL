@@ -88,13 +88,11 @@ namespace FinSight.Helpers
 
         /// <summary>
         /// Returns true if the role mandates Two-Factor Authentication.
-        /// High-privilege roles (Super Admin, Admin, Finance Manager) always require 2FA.
+        /// Tenant Admin accounts require OTP; other roles can sign in normally.
         /// </summary>
         public static bool RequiresTwoFactor(int roleId)
         {
-            return roleId == SuperAdmin
-                || roleId == Admin
-                || roleId == FinanceManager;
+            return roleId == Admin;
         }
 
         /// <summary>
