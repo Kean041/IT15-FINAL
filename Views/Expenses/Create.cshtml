@@ -359,8 +359,12 @@
 
             fetch(form.action, {
                 method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
                 body: new FormData(form)
-            }).then(res => {
+            }).then(async res => {
+                const payload = await res.json().catch(() => ({}));
                 if (res.ok) {
                     Swal.fire({
                         title: 'Expense Recorded Successfully',
@@ -368,10 +372,10 @@
                         icon: 'success',
                         confirmButtonColor: '#05828e'
                     }).then(() => {
-                        window.location.href = '@Url.Action("Index", "Expenses")';
+                        window.location.href = payload.redirectUrl || '@Url.Action("Index", "Expenses")';
                     });
                 } else {
-                    Swal.fire('Error', 'An error occurred while recording the expense. Please ensure all fields are valid.', 'error');
+                    Swal.fire('Error', payload.message || 'An error occurred while recording the expense. Please ensure all fields are valid.', 'error');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalText;
                 }

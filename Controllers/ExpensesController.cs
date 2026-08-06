@@ -531,6 +531,28 @@ namespace FinSight.Controllers
             return results;
         }
 
+        private async Task<int> ExpenseExecuteAsync(string sql, Action<DbCommand> configure)
+        {
+            var connection = _db.Database.GetDbConnection();
+            var shouldClose = connection.State != ConnectionState.Open;
+
+            if (shouldClose)
+                await connection.OpenAsync();
+
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = sql;
+                configure(command);
+                return await command.ExecuteNonQueryAsync();
+            }
+            finally
+            {
+                if (shouldClose)
+                    await connection.CloseAsync();
+            }
+        }
+
         private static void AddParameter(DbCommand command, string name, object? value)
         {
             var parameter = command.CreateParameter();
@@ -579,6 +601,7 @@ namespace FinSight.Controllers
             if (!IsAuthenticated) return RedirectToLogin();
             if (!CanManage) return AccessDenied();
 
+            await EnsureExpenseCreateSchemaBestEffortAsync();
             await PopulateBudgetDropdown(null);
             return View();
         }
@@ -594,6 +617,27 @@ namespace FinSight.Controllers
             if (!CanManage) return AccessDenied();
 
             var tenantFilter = GetTenantFilter();
+
+            if (!HttpContext.Items.ContainsKey("__UseLegacyExpenseCreate"))
+            {
+                try
+                {
+                    return await CreateExpenseCompatibilityAsync(model, tenantFilter);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,
+                        "Expense create failed for user {UserID}, role {RoleID}, tenant {TenantID}, budget {BudgetID}.",
+                        CurrentUserID,
+                        CurrentRoleID,
+                        tenantFilter,
+                        model.BudgetID);
+
+                    return await ExpenseCreateFailureResultAsync(
+                        model,
+                        "Unable to record the expense because the hosted database rejected the save. Please try again after the latest deployment finishes.");
+                }
+            }
 
             // Clear validation state for system-assigned properties not in the form
             ModelState.Remove("DepartmentID");
@@ -897,6 +941,22 @@ namespace FinSight.Controllers
         {
             if (!IsAuthenticated) return Unauthorized();
 
+            if (!HttpContext.Items.ContainsKey("__UseLegacyExpenseRequestLookup"))
+            {
+                await EnsureExpenseCreateSchemaBestEffortAsync();
+                var compatibleRequests = await LoadApprovedRequestOptionsAsync(budgetId, GetTenantFilter());
+                return Json(compatibleRequests.Select(r => new
+                {
+                    r.RequestID,
+                    r.Title,
+                    r.Description,
+                    r.RequestedAmount,
+                    r.BudgetID,
+                    Department = r.DepartmentName,
+                    Category = r.Category
+                }));
+            }
+
             var tenantFilter = GetTenantFilter();
             var requests = await _db.BudgetRequests
                 .Include(r => r.Department)
@@ -924,6 +984,24 @@ namespace FinSight.Controllers
         public async Task<IActionResult> GetRequestDetails(int requestId)
         {
             if (!IsAuthenticated) return Unauthorized();
+
+            if (!HttpContext.Items.ContainsKey("__UseLegacyExpenseRequestDetails"))
+            {
+                await EnsureExpenseCreateSchemaBestEffortAsync();
+                var compatibleRequest = await LoadApprovedRequestByIdAsync(requestId, null, GetTenantFilter());
+                if (compatibleRequest == null) return NotFound();
+
+                return Json(new
+                {
+                    compatibleRequest.RequestID,
+                    compatibleRequest.Title,
+                    compatibleRequest.Description,
+                    compatibleRequest.RequestedAmount,
+                    compatibleRequest.BudgetID,
+                    Department = compatibleRequest.DepartmentName,
+                    Category = compatibleRequest.Category
+                });
+            }
 
             var tenantFilter = GetTenantFilter();
             var request = await _db.BudgetRequests
@@ -955,6 +1033,36 @@ namespace FinSight.Controllers
         public async Task<IActionResult> GetBudgetDetails(int budgetId, int? excludeExpenseId = null)
         {
             if (!IsAuthenticated) return Unauthorized();
+
+            if (!HttpContext.Items.ContainsKey("__UseLegacyExpenseBudgetDetails"))
+            {
+                await EnsureExpenseCreateSchemaBestEffortAsync();
+                var compatibleBudget = await LoadExpenseBudgetForCreateAsync(budgetId, GetTenantFilter());
+                if (compatibleBudget == null) return NotFound();
+
+                var compatibleSpent = await GetBudgetSpentCompatibilityAsync(budgetId, excludeExpenseId);
+                var compatibleRemaining = compatibleBudget.Amount - compatibleSpent;
+                var compatibleUtilization = compatibleBudget.Amount > 0
+                    ? Math.Round((compatibleSpent / compatibleBudget.Amount) * 100m, 1)
+                    : 0m;
+                var compatibleIndicator = "healthy";
+                if (compatibleRemaining < 0 || compatibleUtilization >= 90)
+                    compatibleIndicator = "danger";
+                else if (compatibleUtilization >= 70)
+                    compatibleIndicator = "warning";
+
+                return Json(new
+                {
+                    Total = compatibleBudget.Amount,
+                    Used = compatibleSpent,
+                    Remaining = compatibleRemaining,
+                    Utilization = compatibleUtilization,
+                    Indicator = compatibleIndicator,
+                    Department = compatibleBudget.DepartmentName,
+                    Category = compatibleBudget.Category,
+                    Year = compatibleBudget.Year
+                });
+            }
 
             var tenantFilter = GetTenantFilter();
             var budget = await _db.Budgets
@@ -997,8 +1105,431 @@ namespace FinSight.Controllers
         // ─────────────────────────────────────────────
         // Helper: Populate budget dropdown
         // ─────────────────────────────────────────────
+        private async Task<IActionResult> CreateExpenseCompatibilityAsync(Expense model, int? tenantFilter)
+        {
+            await EnsureExpenseCreateSchemaBestEffortAsync();
+            ClearExpenseCreateModelState();
+
+            var budget = await LoadExpenseBudgetForCreateAsync(model.BudgetID, tenantFilter);
+            if (budget == null)
+            {
+                ModelState.AddModelError(nameof(model.BudgetID), "Selected approved budget allocation does not exist.");
+                return await ExpenseCreateFailureResultAsync(model, "Selected approved budget allocation does not exist.");
+            }
+
+            var linkedRequest = await LoadApprovedRequestByIdAsync(model.BudgetRequestID, budget.BudgetID, tenantFilter);
+            if (model.BudgetRequestID.HasValue && linkedRequest == null)
+            {
+                ModelState.AddModelError(nameof(model.BudgetRequestID), "Selected budget request is not approved for this allocation.");
+                return await ExpenseCreateFailureResultAsync(model, "Selected budget request is not approved for this allocation.");
+            }
+
+            ApplyRequestDefaults(model, linkedRequest, budget);
+            ClearResolvedExpenseTextErrors(model);
+
+            if (!ModelState.IsValid)
+                return await ExpenseCreateFailureResultAsync(model, "Please check the required fields and try again.");
+
+            var spent = await GetBudgetSpentCompatibilityAsync(budget.BudgetID);
+            var remaining = budget.Amount - spent;
+            if (model.Amount > remaining || remaining < 0)
+            {
+                ModelState.AddModelError(nameof(model.Amount), $"Expense amount ({model.Amount:N2}) exceeds remaining budget ({remaining:N2}).");
+                await InsertExpenseAuditLogBestEffortAsync(
+                    tenantFilter ?? budget.TenantID,
+                    "Security",
+                    "Warning",
+                    "Budget Overrun Attempt",
+                    $"User '{CurrentFullName}' attempted expense of PHP {model.Amount:N2} on budget '{budget.Category}' (ID:{budget.BudgetID}). Remaining: PHP {remaining:N2}.");
+
+                return await ExpenseCreateFailureResultAsync(model, $"Expense amount exceeds the remaining budget ({remaining:N2}).");
+            }
+
+            model.TenantID = budget.TenantID;
+            model.DepartmentID = budget.DepartmentID;
+            model.CreatedBy = CurrentUserID ?? 0;
+            model.CreatedAt = DateTime.Now;
+            model.Year = budget.Year;
+            model.Status = "Recorded";
+
+            await InsertExpenseCompatibilityAsync(model);
+
+            await InsertExpenseAuditLogBestEffortAsync(
+                tenantFilter ?? budget.TenantID,
+                "System",
+                "Info",
+                "Expense Created",
+                $"Recorded expense '{model.ExpenseTitle}' for PHP {model.Amount:N2} against budget '{budget.Category}' ({budget.DepartmentName}).");
+
+            await InsertExpenseNotificationBestEffortAsync(
+                budget.TenantID,
+                "New Expense Recorded",
+                $"PHP {model.Amount:N2} expense '{model.ExpenseTitle}' recorded against {budget.DepartmentName} budget.");
+
+            TempData["Success"] = "Expense recorded successfully.";
+
+            if (IsAjaxRequest())
+                return Ok(new { redirectUrl = Url.Action(nameof(Index), "Expenses") });
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        private void ClearExpenseCreateModelState()
+        {
+            ModelState.Remove("DepartmentID");
+            ModelState.Remove("TenantID");
+            ModelState.Remove("Year");
+            ModelState.Remove("CreatedBy");
+            ModelState.Remove("Status");
+        }
+
+        private void ClearResolvedExpenseTextErrors(Expense model)
+        {
+            if (!string.IsNullOrWhiteSpace(model.ExpenseTitle))
+                ModelState.Remove(nameof(model.ExpenseTitle));
+
+            if (!string.IsNullOrWhiteSpace(model.Category))
+                ModelState.Remove(nameof(model.Category));
+
+            if (!string.IsNullOrWhiteSpace(model.Description))
+                ModelState.Remove(nameof(model.Description));
+        }
+
+        private async Task<IActionResult> ExpenseCreateFailureResultAsync(Expense model, string fallbackMessage)
+        {
+            await PopulateBudgetDropdown(model.BudgetID);
+
+            if (IsAjaxRequest())
+            {
+                var messages = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? fallbackMessage : e.ErrorMessage)
+                    .Where(message => !string.IsNullOrWhiteSpace(message))
+                    .Distinct()
+                    .ToList();
+
+                return BadRequest(new
+                {
+                    message = messages.Count > 0 ? string.Join(" ", messages) : fallbackMessage
+                });
+            }
+
+            return View(model);
+        }
+
+        private bool IsAjaxRequest()
+        {
+            return string.Equals(
+                Request.Headers["X-Requested-With"].ToString(),
+                "XMLHttpRequest",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task EnsureExpenseCreateSchemaBestEffortAsync()
+        {
+            await EnsureFinanceSchemaBestEffortAsync();
+
+            try
+            {
+                await DbInitializer.EnsureAuthSchemaAsync(_db, _logger);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Auth support schema repair failed before recording an expense; continuing with required expense insert only.");
+            }
+        }
+
+        private async Task<List<SelectListItem>> LoadBudgetDropdownOptionsAsync(int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT
+                    b.BudgetID,
+                    b.Category,
+                    b.[Year],
+                    COALESCE(d.DepartmentName, 'N/A') AS DepartmentName
+                FROM Budgets b
+                LEFT JOIN Departments d ON d.DepartmentID = b.DepartmentID
+                WHERE (@TenantID IS NULL OR b.TenantID = @TenantID)
+                  AND b.[Status] = 'Active'
+                ORDER BY COALESCE(d.DepartmentName, 'N/A'), b.Category, b.[Year] DESC";
+
+            return await ExpenseQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader => new SelectListItem
+            {
+                Value = GetInt32(reader, "BudgetID").ToString(),
+                Text = $"{GetString(reader, "DepartmentName", "N/A")} - {GetString(reader, "Category", "General")} ({GetInt32(reader, "Year")})"
+            });
+        }
+
+        private async Task<ExpenseBudgetRow?> LoadExpenseBudgetForCreateAsync(int budgetId, int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT
+                    b.BudgetID,
+                    b.DepartmentID,
+                    b.TenantID,
+                    b.Category,
+                    b.Amount,
+                    b.[Year],
+                    COALESCE(d.DepartmentName, 'N/A') AS DepartmentName
+                FROM Budgets b
+                LEFT JOIN Departments d ON d.DepartmentID = b.DepartmentID
+                WHERE b.BudgetID = @BudgetID
+                  AND (@TenantID IS NULL OR b.TenantID = @TenantID)
+                  AND b.[Status] = 'Active'";
+
+            var rows = await ExpenseQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@BudgetID", budgetId);
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, reader => new ExpenseBudgetRow
+            {
+                BudgetID = GetInt32(reader, "BudgetID"),
+                DepartmentID = GetInt32(reader, "DepartmentID"),
+                TenantID = GetInt32(reader, "TenantID"),
+                Category = GetString(reader, "Category", "General"),
+                Amount = GetDecimal(reader, "Amount"),
+                Year = GetInt32(reader, "Year"),
+                DepartmentName = GetString(reader, "DepartmentName", "N/A")
+            });
+
+            return rows.FirstOrDefault();
+        }
+
+        private async Task<List<ExpenseRequestRow>> LoadApprovedRequestOptionsAsync(int budgetId, int? tenantFilter)
+        {
+            const string sql = @"
+                SELECT
+                    r.RequestID,
+                    r.Title,
+                    r.[Description],
+                    r.RequestedAmount,
+                    r.BudgetID,
+                    COALESCE(d.DepartmentName, '') AS DepartmentName,
+                    COALESCE(b.Category, '') AS Category
+                FROM BudgetRequests r
+                LEFT JOIN Departments d ON d.DepartmentID = r.DepartmentID
+                LEFT JOIN Budgets b ON b.BudgetID = r.BudgetID
+                WHERE r.BudgetID = @BudgetID
+                  AND r.[Status] = 'Approved'
+                  AND (@TenantID IS NULL OR r.TenantID = @TenantID)
+                ORDER BY r.CreatedAt DESC, r.RequestID DESC";
+
+            return await ExpenseQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@BudgetID", budgetId);
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, MapExpenseRequestRow);
+        }
+
+        private async Task<ExpenseRequestRow?> LoadApprovedRequestByIdAsync(int? requestId, int? budgetId, int? tenantFilter)
+        {
+            if (!requestId.HasValue)
+                return null;
+
+            const string sql = @"
+                SELECT
+                    r.RequestID,
+                    r.Title,
+                    r.[Description],
+                    r.RequestedAmount,
+                    r.BudgetID,
+                    COALESCE(d.DepartmentName, '') AS DepartmentName,
+                    COALESCE(b.Category, '') AS Category
+                FROM BudgetRequests r
+                LEFT JOIN Departments d ON d.DepartmentID = r.DepartmentID
+                LEFT JOIN Budgets b ON b.BudgetID = r.BudgetID
+                WHERE r.RequestID = @RequestID
+                  AND (@BudgetID IS NULL OR r.BudgetID = @BudgetID)
+                  AND r.[Status] = 'Approved'
+                  AND (@TenantID IS NULL OR r.TenantID = @TenantID)";
+
+            var rows = await ExpenseQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@RequestID", requestId.Value);
+                AddParameter(command, "@BudgetID", budgetId);
+                AddParameter(command, "@TenantID", tenantFilter);
+            }, MapExpenseRequestRow);
+
+            return rows.FirstOrDefault();
+        }
+
+        private static ExpenseRequestRow MapExpenseRequestRow(DbDataReader reader)
+        {
+            return new ExpenseRequestRow
+            {
+                RequestID = GetInt32(reader, "RequestID"),
+                Title = GetString(reader, "Title", "Budget Request"),
+                Description = GetStringOrNull(reader, "Description"),
+                RequestedAmount = GetDecimal(reader, "RequestedAmount"),
+                BudgetID = GetInt32(reader, "BudgetID"),
+                DepartmentName = GetString(reader, "DepartmentName", string.Empty),
+                Category = GetString(reader, "Category", string.Empty)
+            };
+        }
+
+        private async Task<decimal> GetBudgetSpentCompatibilityAsync(int budgetId, int? excludeExpenseId = null)
+        {
+            const string sql = @"
+                SELECT COALESCE(SUM(Amount), 0) AS Spent
+                FROM Expenses
+                WHERE BudgetID = @BudgetID
+                  AND (@ExcludeExpenseID IS NULL OR ExpenseID <> @ExcludeExpenseID)";
+
+            var rows = await ExpenseQueryAsync(sql, command =>
+            {
+                AddParameter(command, "@BudgetID", budgetId);
+                AddParameter(command, "@ExcludeExpenseID", excludeExpenseId);
+            }, reader => GetDecimal(reader, "Spent"));
+
+            return rows.FirstOrDefault();
+        }
+
+        private async Task InsertExpenseCompatibilityAsync(Expense model)
+        {
+            const string sql = @"
+                INSERT INTO Expenses
+                (
+                    BudgetRequestID,
+                    BudgetID,
+                    DepartmentID,
+                    TenantID,
+                    ExpenseTitle,
+                    Category,
+                    [Description],
+                    Amount,
+                    ExpenseDate,
+                    [Status],
+                    CreatedBy,
+                    [Year],
+                    CreatedAt
+                )
+                VALUES
+                (
+                    @BudgetRequestID,
+                    @BudgetID,
+                    @DepartmentID,
+                    @TenantID,
+                    @ExpenseTitle,
+                    @Category,
+                    @Description,
+                    @Amount,
+                    @ExpenseDate,
+                    @Status,
+                    @CreatedBy,
+                    @Year,
+                    @CreatedAt
+                )";
+
+            await ExpenseExecuteAsync(sql, command =>
+            {
+                AddParameter(command, "@BudgetRequestID", model.BudgetRequestID);
+                AddParameter(command, "@BudgetID", model.BudgetID);
+                AddParameter(command, "@DepartmentID", model.DepartmentID);
+                AddParameter(command, "@TenantID", model.TenantID);
+                AddParameter(command, "@ExpenseTitle", model.ExpenseTitle?.Trim());
+                AddParameter(command, "@Category", model.Category?.Trim());
+                AddParameter(command, "@Description", model.Description?.Trim());
+                AddParameter(command, "@Amount", model.Amount);
+                AddParameter(command, "@ExpenseDate", model.ExpenseDate == default ? DateTime.Now : model.ExpenseDate);
+                AddParameter(command, "@Status", model.Status);
+                AddParameter(command, "@CreatedBy", model.CreatedBy);
+                AddParameter(command, "@Year", model.Year);
+                AddParameter(command, "@CreatedAt", model.CreatedAt == default ? DateTime.Now : model.CreatedAt);
+            });
+        }
+
+        private async Task InsertExpenseAuditLogBestEffortAsync(int tenantId, string logType, string severity, string action, string details)
+        {
+            try
+            {
+                const string sql = @"
+                    INSERT INTO AuditLogs (TenantID, UserID, LogType, Severity, [Action], Details, IPAddress, CreatedAt)
+                    VALUES (@TenantID, @UserID, @LogType, @Severity, @Action, @Details, @IPAddress, @CreatedAt)";
+
+                await ExpenseExecuteAsync(sql, command =>
+                {
+                    AddParameter(command, "@TenantID", tenantId);
+                    AddParameter(command, "@UserID", CurrentUserID);
+                    AddParameter(command, "@LogType", logType);
+                    AddParameter(command, "@Severity", severity);
+                    AddParameter(command, "@Action", action);
+                    AddParameter(command, "@Details", details);
+                    AddParameter(command, "@IPAddress", HttpContext.Connection.RemoteIpAddress?.ToString());
+                    AddParameter(command, "@CreatedAt", DateTime.Now);
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Expense audit log insert failed after expense operation.");
+            }
+        }
+
+        private async Task InsertExpenseNotificationBestEffortAsync(int tenantId, string title, string message)
+        {
+            try
+            {
+                const string sql = @"
+                    INSERT INTO Notifications (TenantID, UserID, Title, [Message], NotificationType, IsRead, RedirectUrl, CreatedAt)
+                    VALUES (@TenantID, @UserID, @Title, @Message, @NotificationType, @IsRead, @RedirectUrl, @CreatedAt)";
+
+                await ExpenseExecuteAsync(sql, command =>
+                {
+                    AddParameter(command, "@TenantID", tenantId);
+                    AddParameter(command, "@UserID", null);
+                    AddParameter(command, "@Title", title);
+                    AddParameter(command, "@Message", message);
+                    AddParameter(command, "@NotificationType", "System");
+                    AddParameter(command, "@IsRead", false);
+                    AddParameter(command, "@RedirectUrl", "/Expenses");
+                    AddParameter(command, "@CreatedAt", DateTime.Now);
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Expense notification insert failed after expense creation.");
+            }
+        }
+
+        private static void ApplyRequestDefaults(Expense model, ExpenseRequestRow? request, ExpenseBudgetRow budget)
+        {
+            if (request == null) return;
+
+            if (string.IsNullOrWhiteSpace(model.ExpenseTitle))
+                model.ExpenseTitle = request.Title;
+
+            if (string.IsNullOrWhiteSpace(model.Category))
+                model.Category = string.IsNullOrWhiteSpace(request.Category) ? budget.Category : request.Category;
+
+            if (string.IsNullOrWhiteSpace(model.Description) && !string.IsNullOrWhiteSpace(request.Description))
+                model.Description = request.Description;
+        }
+
+        private static void ApplyRequestDefaults(Expense model, BudgetRequest? request, Budget budget)
+        {
+            if (request == null) return;
+
+            if (string.IsNullOrWhiteSpace(model.ExpenseTitle))
+                model.ExpenseTitle = request.Title;
+
+            if (string.IsNullOrWhiteSpace(model.Category))
+                model.Category = budget.Category;
+
+            if (string.IsNullOrWhiteSpace(model.Description) && !string.IsNullOrWhiteSpace(request.Description))
+                model.Description = request.Description;
+        }
+
         private async Task PopulateBudgetDropdown(int? selectedBudgetId)
         {
+            if (!HttpContext.Items.ContainsKey("__UseLegacyExpenseBudgetDropdown"))
+            {
+                var budgetOptions = await LoadBudgetDropdownOptionsAsync(GetTenantFilter());
+                ViewBag.BudgetID = new SelectList(budgetOptions, "Value", "Text", selectedBudgetId);
+                return;
+            }
+
             var tenantFilter = GetTenantFilter();
             var budgets = await _db.Budgets
                 .Include(b => b.Department)
@@ -1041,18 +1572,27 @@ namespace FinSight.Controllers
                     r.Status == "Approved");
         }
 
-        private static void ApplyRequestDefaults(Expense model, BudgetRequest? request, Budget budget)
+        private sealed class ExpenseBudgetRow
         {
-            if (request == null) return;
-
-            if (string.IsNullOrWhiteSpace(model.ExpenseTitle))
-                model.ExpenseTitle = request.Title;
-
-            if (string.IsNullOrWhiteSpace(model.Category))
-                model.Category = budget.Category;
-
-            if (string.IsNullOrWhiteSpace(model.Description) && !string.IsNullOrWhiteSpace(request.Description))
-                model.Description = request.Description;
+            public int BudgetID { get; set; }
+            public int DepartmentID { get; set; }
+            public int TenantID { get; set; }
+            public string Category { get; set; } = string.Empty;
+            public decimal Amount { get; set; }
+            public int Year { get; set; }
+            public string DepartmentName { get; set; } = "N/A";
         }
+
+        private sealed class ExpenseRequestRow
+        {
+            public int RequestID { get; set; }
+            public string Title { get; set; } = "Budget Request";
+            public string? Description { get; set; }
+            public decimal RequestedAmount { get; set; }
+            public int BudgetID { get; set; }
+            public string DepartmentName { get; set; } = string.Empty;
+            public string Category { get; set; } = string.Empty;
+        }
+
     }
 }
